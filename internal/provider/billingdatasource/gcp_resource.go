@@ -1,4 +1,4 @@
-package provider
+package billingdatasource
 
 import (
 	"context"
@@ -12,19 +12,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/costory-io/costory-terraform/internal/costoryapi"
 )
 
 var (
-	_ resource.Resource                = &gcpBillingDatasourceResource{}
-	_ resource.ResourceWithConfigure   = &gcpBillingDatasourceResource{}
-	_ resource.ResourceWithImportState = &gcpBillingDatasourceResource{}
+	_ resource.Resource                = &gcpResource{}
+	_ resource.ResourceWithConfigure   = &gcpResource{}
+	_ resource.ResourceWithImportState = &gcpResource{}
 )
 
-type gcpBillingDatasourceResource struct {
-	client *Client
+type gcpResource struct {
+	client *costoryapi.Client
 }
 
-type gcpBillingDatasourceResourceModel struct {
+type gcpResourceModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	BQTablePath       types.String `tfsdk:"bq_table_path"`
@@ -33,16 +35,16 @@ type gcpBillingDatasourceResourceModel struct {
 	EndDate           types.String `tfsdk:"end_date"`
 }
 
-// NewGCPBillingDatasourceResource returns the GCP billing datasource resource.
-func NewGCPBillingDatasourceResource() resource.Resource {
-	return &gcpBillingDatasourceResource{}
+// NewGCPResource returns the GCP billing datasource resource.
+func NewGCPResource() resource.Resource {
+	return &gcpResource{}
 }
 
-func (r *gcpBillingDatasourceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *gcpResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = fmt.Sprintf("%s_billing_datasource_gcp", req.ProviderTypeName)
 }
 
-func (r *gcpBillingDatasourceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *gcpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Creates a Costory GCP billing datasource.",
 		Attributes: map[string]schema.Attribute{
@@ -89,16 +91,16 @@ func (r *gcpBillingDatasourceResource) Schema(_ context.Context, _ resource.Sche
 	}
 }
 
-func (r *gcpBillingDatasourceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *gcpResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*Client)
+	client, ok := req.ProviderData.(*costoryapi.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected resource configure type",
-			fmt.Sprintf("Expected *provider.Client, got: %T. This is always a provider implementation bug.", req.ProviderData),
+			fmt.Sprintf("Expected *costoryapi.Client, got: %T. This is always a provider implementation bug.", req.ProviderData),
 		)
 		return
 	}
@@ -106,7 +108,7 @@ func (r *gcpBillingDatasourceResource) Configure(_ context.Context, req resource
 	r.client = client
 }
 
-func (r *gcpBillingDatasourceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *gcpResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		resp.Diagnostics.AddError(
 			"Unconfigured Costory client",
@@ -115,7 +117,7 @@ func (r *gcpBillingDatasourceResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	var plan gcpBillingDatasourceResourceModel
+	var plan gcpResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -146,7 +148,7 @@ func (r *gcpBillingDatasourceResource) Create(ctx context.Context, req resource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *gcpBillingDatasourceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *gcpResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		resp.Diagnostics.AddError(
 			"Unconfigured Costory client",
@@ -155,7 +157,7 @@ func (r *gcpBillingDatasourceResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	var state gcpBillingDatasourceResourceModel
+	var state gcpResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -163,7 +165,7 @@ func (r *gcpBillingDatasourceResource) Read(ctx context.Context, req resource.Re
 
 	current, err := r.client.GetGCPBillingDatasource(ctx, state.ID.ValueString())
 	if err != nil {
-		if errors.Is(err, errNotFound) {
+		if errors.Is(err, costoryapi.ErrNotFound) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -183,14 +185,14 @@ func (r *gcpBillingDatasourceResource) Read(ctx context.Context, req resource.Re
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *gcpBillingDatasourceResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *gcpResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError(
 		"Update not supported",
 		"All attributes are immutable for costory_billing_datasource_gcp. Terraform should replace the resource instead.",
 	)
 }
 
-func (r *gcpBillingDatasourceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *gcpResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		resp.Diagnostics.AddError(
 			"Unconfigured Costory client",
@@ -199,14 +201,14 @@ func (r *gcpBillingDatasourceResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	var state gcpBillingDatasourceResourceModel
+	var state gcpResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	err := r.client.DeleteBillingDatasource(ctx, state.ID.ValueString())
-	if err != nil && !errors.Is(err, errNotFound) {
+	if err != nil && !errors.Is(err, costoryapi.ErrNotFound) {
 		resp.Diagnostics.AddError(
 			"Unable to delete GCP billing datasource",
 			err.Error(),
@@ -215,12 +217,12 @@ func (r *gcpBillingDatasourceResource) Delete(ctx context.Context, req resource.
 	}
 }
 
-func (r *gcpBillingDatasourceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *gcpResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (m gcpBillingDatasourceResourceModel) toRequestModel() GCPBillingDatasourceRequest {
-	req := GCPBillingDatasourceRequest{
+func (m gcpResourceModel) toRequestModel() costoryapi.GCPBillingDatasourceRequest {
+	req := costoryapi.GCPBillingDatasourceRequest{
 		Name:        m.Name.ValueString(),
 		BQTablePath: m.BQTablePath.ValueString(),
 	}
@@ -243,7 +245,7 @@ func (m gcpBillingDatasourceResourceModel) toRequestModel() GCPBillingDatasource
 	return req
 }
 
-func (m *gcpBillingDatasourceResourceModel) mergeAPIResponse(apiResponse *GCPBillingDatasource) {
+func (m *gcpResourceModel) mergeAPIResponse(apiResponse *costoryapi.GCPBillingDatasource) {
 	if apiResponse == nil {
 		return
 	}

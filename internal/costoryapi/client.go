@@ -1,4 +1,4 @@
-package provider
+package costoryapi
 
 import (
 	"bytes"
@@ -18,7 +18,8 @@ const (
 	maxResponseBodyBytes     = 1024 * 1024
 )
 
-var errNotFound = errors.New("costory resource not found")
+// ErrNotFound is returned when the requested Costory resource does not exist.
+var ErrNotFound = errors.New("costory resource not found")
 
 type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -161,7 +162,7 @@ func (c *Client) GetGCPBillingDatasource(ctx context.Context, datasourceID strin
 	}
 
 	if statusCode == http.StatusNotFound {
-		return nil, errNotFound
+		return nil, ErrNotFound
 	}
 
 	if statusCode != http.StatusOK {
@@ -189,7 +190,7 @@ func (c *Client) DeleteBillingDatasource(ctx context.Context, datasourceID strin
 	}
 
 	if statusCode == http.StatusNotFound {
-		return errNotFound
+		return ErrNotFound
 	}
 
 	if statusCode == http.StatusNoContent || statusCode == http.StatusOK {

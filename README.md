@@ -19,6 +19,7 @@ The provider is intentionally simple:
 - Go provider implementation using Terraform Plugin Framework
 - `costory_service_account` data source
 - `costory_billing_datasource_gcp` resource (create/read/delete/import)
+- Module-oriented billing datasource package for future resource growth
 - HTTP client abstraction and unit tests
 - GitHub Actions CI workflow for:
   - formatting check (`gofmt`)
@@ -53,7 +54,7 @@ Expected JSON response:
 }
 ```
 
-All API routes are centralized in `internal/provider/routes.go` so you can easily
+All API routes are centralized in `internal/costoryapi/routes.go` so you can easily
 swap route paths once backend endpoints are finalized.
 
 ---
@@ -150,8 +151,8 @@ output "sub_ids" {
 
 - Entry point: `main.go`
 - Provider config and registration: `internal/provider/provider.go`
-- Costory API client: `internal/provider/client.go`
-- API route definitions: `internal/provider/routes.go`
+- Costory API client: `internal/costoryapi/client.go`
+- API route definitions: `internal/costoryapi/routes.go`
 - Data source implementation: `internal/provider/context_data_source.go`
-- GCP resource implementation: `internal/provider/gcp_billing_datasource_resource.go`
+- Billing datasource resources: `internal/provider/billingdatasource/`
 - CI workflow: `.github/workflows/ci.yml`

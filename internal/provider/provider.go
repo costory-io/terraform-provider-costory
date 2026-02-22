@@ -12,6 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/costory-io/costory-terraform/internal/costoryapi"
+	"github.com/costory-io/costory-terraform/internal/provider/billingdatasource"
 )
 
 const defaultBaseURL = "https://app.costory.io"
@@ -129,7 +132,7 @@ func (p *costoryProvider) Configure(ctx context.Context, req provider.ConfigureR
 		baseURL = defaultBaseURL
 	}
 
-	client := NewClient(baseURL, slug, token, &http.Client{
+	client := costoryapi.NewClient(baseURL, slug, token, &http.Client{
 		Timeout: 30 * time.Second,
 	})
 
@@ -145,6 +148,6 @@ func (p *costoryProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewGCPBillingDatasourceResource,
+		billingdatasource.NewGCPResource,
 	}
 }

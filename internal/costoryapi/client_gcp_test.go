@@ -1,4 +1,4 @@
-package provider
+package costoryapi
 
 import (
 	"context"
@@ -103,8 +103,8 @@ func TestClientGetGCPBillingDatasourceNotFound(t *testing.T) {
 	client := NewClient(server.URL, "test-slug", "test-token", server.Client())
 
 	_, err := client.GetGCPBillingDatasource(context.Background(), "missing-id")
-	if !errors.Is(err, errNotFound) {
-		t.Fatalf("expected errNotFound, got: %v", err)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got: %v", err)
 	}
 }
 

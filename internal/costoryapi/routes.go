@@ -1,4 +1,4 @@
-package provider
+package costoryapi
 
 import "net/url"
 

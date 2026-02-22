@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/costory-io/costory-terraform/internal/costoryapi"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -16,7 +18,7 @@ var (
 )
 
 type serviceAccountDataSource struct {
-	client *Client
+	client *costoryapi.Client
 }
 
 type serviceAccountDataSourceModel struct {
@@ -55,11 +57,11 @@ func (d *serviceAccountDataSource) Configure(_ context.Context, req datasource.C
 		return
 	}
 
-	client, ok := req.ProviderData.(*Client)
+	client, ok := req.ProviderData.(*costoryapi.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected data source configure type",
-			fmt.Sprintf("Expected *provider.Client, got: %T. This is always a provider implementation bug.", req.ProviderData),
+			fmt.Sprintf("Expected *costoryapi.Client, got: %T. This is always a provider implementation bug.", req.ProviderData),
 		)
 		return
 	}
