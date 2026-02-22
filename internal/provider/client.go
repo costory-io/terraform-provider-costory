@@ -15,6 +15,7 @@ type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Client is a lightweight Costory API client used by the provider.
 type Client struct {
 	baseURL    string
 	slug       string
@@ -22,11 +23,13 @@ type Client struct {
 	httpClient httpDoer
 }
 
+// ContextResponse represents the Costory context payload returned by the API.
 type ContextResponse struct {
 	ServiceAccount string   `json:"service_account"`
 	SubIDs         []string `json:"sub_ids"`
 }
 
+// NewClient creates a new Costory API client.
 func NewClient(baseURL, slug, token string, httpClient httpDoer) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -40,6 +43,7 @@ func NewClient(baseURL, slug, token string, httpClient httpDoer) *Client {
 	}
 }
 
+// GetContext fetches service-account context for the configured Costory tenant.
 func (c *Client) GetContext(ctx context.Context) (*ContextResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint(contextEndpoint), nil)
 	if err != nil {
@@ -54,7 +58,9 @@ func (c *Client) GetContext(ctx context.Context) (*ContextResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))

@@ -1,3 +1,4 @@
+// Package main runs the Costory Terraform provider plugin server.
 package main
 
 import (

@@ -30,6 +30,7 @@ type costoryProviderModel struct {
 	BaseURL types.String `tfsdk:"base_url"`
 }
 
+// New returns a constructor for the Costory Terraform provider implementation.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &costoryProvider{

@@ -24,6 +24,7 @@ type contextDataSourceModel struct {
 	SubIDs         types.List   `tfsdk:"sub_ids"`
 }
 
+// NewContextDataSource returns the Costory context data source.
 func NewContextDataSource() datasource.DataSource {
 	return &contextDataSource{}
 }
