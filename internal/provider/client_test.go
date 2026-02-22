@@ -16,7 +16,7 @@ func TestClientGetServiceAccount(t *testing.T) {
 			t.Fatalf("unexpected method: got %q, want %q", got, want)
 		}
 
-		if got, want := r.URL.Path, serviceAccountEndpoint; got != want {
+		if got, want := r.URL.Path, routeServiceAccount; got != want {
 			t.Fatalf("unexpected path: got %q, want %q", got, want)
 		}
 

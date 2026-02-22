@@ -5,7 +5,9 @@ This repository is a **template** for a custom Terraform provider built with the
 
 The provider is intentionally simple:
 - Configure provider with `slug` and `token`
-- Send a `GET` request to the Costory API
+- Send API calls to the Costory backend for:
+  - service-account discovery (`data.costory_service_account`)
+  - GCP billing datasource lifecycle (`resource.costory_billing_datasource_gcp`)
 - Expose these values through a data source:
   - `service_account` (string)
   - `sub_ids` (list of string)
@@ -16,6 +18,7 @@ The provider is intentionally simple:
 
 - Go provider implementation using Terraform Plugin Framework
 - `costory_service_account` data source
+- `costory_billing_datasource_gcp` resource (create/read/delete/import)
 - HTTP client abstraction and unit tests
 - GitHub Actions CI workflow for:
   - formatting check (`gofmt`)
@@ -31,6 +34,10 @@ The provider is intentionally simple:
 Current implementation calls:
 
 - `GET /api/v1/terraform/context`
+- `POST /billing-datasources/terraform/validate`
+- `POST /billing-datasources/terraform`
+- `GET /billing-datasources/terraform/:id`
+- `DELETE /billing-datasources/terraform/:id`
 
 With headers:
 
@@ -46,7 +53,8 @@ Expected JSON response:
 }
 ```
 
-You can change the endpoint/path/header mapping in `internal/provider/client.go`.
+All API routes are centralized in `internal/provider/routes.go` so you can easily
+swap route paths once backend endpoints are finalized.
 
 ---
 
@@ -121,6 +129,12 @@ provider "costory" {
 
 data "costory_service_account" "current" {}
 
+resource "costory_billing_datasource_gcp" "main" {
+  name                = "GCP Billing Export"
+  bq_table_path       = "my-project.billing_export.gcp_billing_export_v1_0123"
+  is_detailed_billing = true
+}
+
 output "service_account" {
   value = data.costory_service_account.current.service_account
 }
@@ -137,5 +151,7 @@ output "sub_ids" {
 - Entry point: `main.go`
 - Provider config and registration: `internal/provider/provider.go`
 - Costory API client: `internal/provider/client.go`
+- API route definitions: `internal/provider/routes.go`
 - Data source implementation: `internal/provider/context_data_source.go`
+- GCP resource implementation: `internal/provider/gcp_billing_datasource_resource.go`
 - CI workflow: `.github/workflows/ci.yml`
