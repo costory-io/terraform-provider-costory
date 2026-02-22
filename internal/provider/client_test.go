@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestClientGetContext(t *testing.T) {
+func TestClientGetServiceAccount(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -16,7 +16,7 @@ func TestClientGetContext(t *testing.T) {
 			t.Fatalf("unexpected method: got %q, want %q", got, want)
 		}
 
-		if got, want := r.URL.Path, contextEndpoint; got != want {
+		if got, want := r.URL.Path, serviceAccountEndpoint; got != want {
 			t.Fatalf("unexpected path: got %q, want %q", got, want)
 		}
 
@@ -35,12 +35,12 @@ func TestClientGetContext(t *testing.T) {
 
 	client := NewClient(server.URL, "test-slug", "test-token", server.Client())
 
-	got, err := client.GetContext(context.Background())
+	got, err := client.GetServiceAccount(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := &ContextResponse{
+	want := &ServiceAccountResponse{
 		ServiceAccount: "sa-test",
 		SubIDs:         []string{"sub-1", "sub-2"},
 	}
@@ -50,7 +50,7 @@ func TestClientGetContext(t *testing.T) {
 	}
 }
 
-func TestClientGetContextUnexpectedStatus(t *testing.T) {
+func TestClientGetServiceAccountUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -60,7 +60,7 @@ func TestClientGetContextUnexpectedStatus(t *testing.T) {
 
 	client := NewClient(server.URL, "test-slug", "test-token", server.Client())
 
-	_, err := client.GetContext(context.Background())
+	_, err := client.GetServiceAccount(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

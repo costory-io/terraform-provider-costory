@@ -15,7 +15,7 @@ The provider is intentionally simple:
 ## What this template includes
 
 - Go provider implementation using Terraform Plugin Framework
-- `costory_context` data source
+- `costory_service_account` data source
 - HTTP client abstraction and unit tests
 - GitHub Actions CI workflow for:
   - formatting check (`gofmt`)
@@ -119,14 +119,14 @@ provider "costory" {
   token = var.costory_token
 }
 
-data "costory_context" "current" {}
+data "costory_service_account" "current" {}
 
 output "service_account" {
-  value = data.costory_context.current.service_account
+  value = data.costory_service_account.current.service_account
 }
 
 output "sub_ids" {
-  value = data.costory_context.current.sub_ids
+  value = data.costory_service_account.current.sub_ids
 }
 ```
 

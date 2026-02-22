@@ -11,31 +11,31 @@ import (
 )
 
 var (
-	_ datasource.DataSource              = &contextDataSource{}
-	_ datasource.DataSourceWithConfigure = &contextDataSource{}
+	_ datasource.DataSource              = &serviceAccountDataSource{}
+	_ datasource.DataSourceWithConfigure = &serviceAccountDataSource{}
 )
 
-type contextDataSource struct {
+type serviceAccountDataSource struct {
 	client *Client
 }
 
-type contextDataSourceModel struct {
+type serviceAccountDataSourceModel struct {
 	ServiceAccount types.String `tfsdk:"service_account"`
 	SubIDs         types.List   `tfsdk:"sub_ids"`
 }
 
-// NewContextDataSource returns the Costory context data source.
-func NewContextDataSource() datasource.DataSource {
-	return &contextDataSource{}
+// NewServiceAccountDataSource returns the Costory service-account data source.
+func NewServiceAccountDataSource() datasource.DataSource {
+	return &serviceAccountDataSource{}
 }
 
-func (d *contextDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = fmt.Sprintf("%s_context", req.ProviderTypeName)
+func (d *serviceAccountDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = fmt.Sprintf("%s_service_account", req.ProviderTypeName)
 }
 
-func (d *contextDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *serviceAccountDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Returns Costory service-account context from the Costory API.",
+		MarkdownDescription: "Returns Costory service-account data from the Costory API.",
 		Attributes: map[string]schema.Attribute{
 			"service_account": schema.StringAttribute{
 				Computed:            true,
@@ -50,7 +50,7 @@ func (d *contextDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 	}
 }
 
-func (d *contextDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *serviceAccountDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -67,7 +67,7 @@ func (d *contextDataSource) Configure(_ context.Context, req datasource.Configur
 	d.client = client
 }
 
-func (d *contextDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *serviceAccountDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.client == nil {
 		resp.Diagnostics.AddError(
 			"Unconfigured Costory client",
@@ -76,20 +76,20 @@ func (d *contextDataSource) Read(ctx context.Context, _ datasource.ReadRequest, 
 		return
 	}
 
-	contextResponse, err := d.client.GetContext(ctx)
+	serviceAccountResponse, err := d.client.GetServiceAccount(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to read Costory context",
+			"Unable to read Costory service account",
 			err.Error(),
 		)
 		return
 	}
 
-	var state contextDataSourceModel
+	var state serviceAccountDataSourceModel
 	var diags diag.Diagnostics
 
-	state.ServiceAccount = types.StringValue(contextResponse.ServiceAccount)
-	state.SubIDs, diags = types.ListValueFrom(ctx, types.StringType, contextResponse.SubIDs)
+	state.ServiceAccount = types.StringValue(serviceAccountResponse.ServiceAccount)
+	state.SubIDs, diags = types.ListValueFrom(ctx, types.StringType, serviceAccountResponse.SubIDs)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

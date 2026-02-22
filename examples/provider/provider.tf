@@ -30,12 +30,12 @@ provider "costory" {
   base_url = var.costory_base_url
 }
 
-data "costory_context" "current" {}
+data "costory_service_account" "current" {}
 
 output "service_account" {
-  value = data.costory_context.current.service_account
+  value = data.costory_service_account.current.service_account
 }
 
 output "sub_ids" {
-  value = data.costory_context.current.sub_ids
+  value = data.costory_service_account.current.sub_ids
 }

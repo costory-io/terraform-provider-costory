@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const contextEndpoint = "/api/v1/terraform/context"
+const serviceAccountEndpoint = "/api/v1/terraform/context"
 
 type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -23,8 +23,8 @@ type Client struct {
 	httpClient httpDoer
 }
 
-// ContextResponse represents the Costory context payload returned by the API.
-type ContextResponse struct {
+// ServiceAccountResponse represents the service-account payload returned by the API.
+type ServiceAccountResponse struct {
 	ServiceAccount string   `json:"service_account"`
 	SubIDs         []string `json:"sub_ids"`
 }
@@ -43,9 +43,9 @@ func NewClient(baseURL, slug, token string, httpClient httpDoer) *Client {
 	}
 }
 
-// GetContext fetches service-account context for the configured Costory tenant.
-func (c *Client) GetContext(ctx context.Context) (*ContextResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint(contextEndpoint), nil)
+// GetServiceAccount fetches service-account data for the configured Costory tenant.
+func (c *Client) GetServiceAccount(ctx context.Context) (*ServiceAccountResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint(serviceAccountEndpoint), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -67,7 +67,7 @@ func (c *Client) GetContext(ctx context.Context) (*ContextResponse, error) {
 		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	var out ContextResponse
+	var out ServiceAccountResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, fmt.Errorf("decode response body: %w", err)
 	}
