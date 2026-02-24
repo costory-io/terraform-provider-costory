@@ -1,0 +1,7 @@
+provider_installation {
+  dev_overrides {
+    "costory-io/costory" = "/Users/tanguy/costory-terraform/bin"
+  }
+
+  direct {}
+}

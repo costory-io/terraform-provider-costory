@@ -28,8 +28,9 @@ type gcpResource struct {
 
 type gcpResourceModel struct {
 	ID                types.String `tfsdk:"id"`
+	Status            types.String `tfsdk:"status"`
 	Name              types.String `tfsdk:"name"`
-	BQTablePath       types.String `tfsdk:"bq_table_path"`
+	BQURI             types.String `tfsdk:"bq_uri"`
 	IsDetailedBilling types.Bool   `tfsdk:"is_detailed_billing"`
 	StartDate         types.String `tfsdk:"start_date"`
 	EndDate           types.String `tfsdk:"end_date"`
@@ -52,6 +53,10 @@ func (r *gcpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				Computed:            true,
 				MarkdownDescription: "Billing datasource ID returned by Costory.",
 			},
+			"status": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Datasource status returned by Costory.",
+			},
 			"name": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Billing datasource display name.",
@@ -59,9 +64,9 @@ func (r *gcpResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"bq_table_path": schema.StringAttribute{
+			"bq_uri": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "BigQuery table path used for billing export.",
+				MarkdownDescription: "BigQuery URI used for billing export (project.dataset.table).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -223,8 +228,8 @@ func (r *gcpResource) ImportState(ctx context.Context, req resource.ImportStateR
 
 func (m gcpResourceModel) toRequestModel() costoryapi.GCPBillingDatasourceRequest {
 	req := costoryapi.GCPBillingDatasourceRequest{
-		Name:        m.Name.ValueString(),
-		BQTablePath: m.BQTablePath.ValueString(),
+		Name:  m.Name.ValueString(),
+		BQURI: m.BQURI.ValueString(),
 	}
 
 	if !m.IsDetailedBilling.IsNull() && !m.IsDetailedBilling.IsUnknown() {
@@ -254,12 +259,17 @@ func (m *gcpResourceModel) mergeAPIResponse(apiResponse *costoryapi.GCPBillingDa
 		m.ID = types.StringValue(apiResponse.ID)
 	}
 
+	m.Status = types.StringNull()
+	if apiResponse.Status != nil {
+		m.Status = types.StringValue(*apiResponse.Status)
+	}
+
 	if apiResponse.Name != "" {
 		m.Name = types.StringValue(apiResponse.Name)
 	}
 
-	if apiResponse.BQTablePath != "" {
-		m.BQTablePath = types.StringValue(apiResponse.BQTablePath)
+	if apiResponse.BQURI != "" {
+		m.BQURI = types.StringValue(apiResponse.BQURI)
 	}
 
 	if apiResponse.IsDetailedBilling != nil {

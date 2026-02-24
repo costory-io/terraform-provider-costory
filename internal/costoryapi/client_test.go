@@ -50,6 +50,32 @@ func TestClientGetServiceAccount(t *testing.T) {
 	}
 }
 
+func TestClientGetServiceAccountCamelCase(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"serviceAccountEmail":"sa-camel","subIds":["sub-a","sub-b"]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-slug", "test-token", server.Client())
+
+	got, err := client.GetServiceAccount(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := &ServiceAccountResponse{
+		ServiceAccount: "sa-camel",
+		SubIDs:         []string{"sub-a", "sub-b"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected context response: got %#v, want %#v", got, want)
+	}
+}
+
 func TestClientGetServiceAccountUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 

@@ -34,11 +34,11 @@ The provider is intentionally simple:
 
 Current implementation calls:
 
-- `GET /api/v1/terraform/context`
-- `POST /billing-datasources/terraform/validate`
-- `POST /billing-datasources/terraform`
-- `GET /billing-datasources/terraform/:id`
-- `DELETE /billing-datasources/terraform/:id`
+- `GET /terraform/`
+- `POST /terraform/billing-datasource/validate`
+- `POST /terraform/billing-datasource`
+- `GET /terraform/billing-datasource/:id`
+- `DELETE /terraform/billing-datasource/:id`
 
 With headers:
 
@@ -111,7 +111,7 @@ go build ./...
 
 ## Example usage
 
-See `examples/provider/provider.tf` for a full example.
+See `examples/provider/main.tf` for a full example.
 
 ```hcl
 terraform {
@@ -132,7 +132,7 @@ data "costory_service_account" "current" {}
 
 resource "costory_billing_datasource_gcp" "main" {
   name                = "GCP Billing Export"
-  bq_table_path       = "my-project.billing_export.gcp_billing_export_v1_0123"
+  bq_uri              = "my-project.billing_export.gcp_billing_export_v1_0123"
   is_detailed_billing = true
 }
 

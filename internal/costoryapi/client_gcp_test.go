@@ -27,11 +27,11 @@ func TestClientGCPBillingDatasourceCRUD(t *testing.T) {
 			createCalls++
 			assertGCPCreateRequest(t, r)
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"id":"gcp-ds-1","name":"GCP Billing","bq_table_path":"project.dataset.table","is_detailed_billing":true}`))
+			_, _ = w.Write([]byte(`{"id":"gcp-ds-1","type":"GCP","name":"GCP Billing","bqUri":"project.dataset.table","isDetailedBilling":true}`))
 		case r.Method == http.MethodGet && r.URL.Path == routeBillingDatasourceByID("gcp-ds-1"):
 			getCalls++
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"gcp-ds-1","name":"GCP Billing","bqTablePath":"project.dataset.table","isDetailedBilling":true,"startDate":"2025-01-01"}`))
+			_, _ = w.Write([]byte(`{"id":"gcp-ds-1","type":"GCP","name":"GCP Billing","bqUri":"project.dataset.table","isDetailedBilling":true,"startDate":"2025-01-01"}`))
 		case r.Method == http.MethodDelete && r.URL.Path == routeBillingDatasourceByID("gcp-ds-1"):
 			deleteCalls++
 			w.WriteHeader(http.StatusNoContent)
@@ -45,7 +45,7 @@ func TestClientGCPBillingDatasourceCRUD(t *testing.T) {
 
 	createRequest := GCPBillingDatasourceRequest{
 		Name:              "GCP Billing",
-		BQTablePath:       "project.dataset.table",
+		BQURI:             "project.dataset.table",
 		IsDetailedBilling: boolPointer(true),
 		StartDate:         stringPointer("2025-01-01"),
 	}
@@ -68,8 +68,8 @@ func TestClientGCPBillingDatasourceCRUD(t *testing.T) {
 		t.Fatalf("unexpected get error: %v", err)
 	}
 
-	if current.BQTablePath != "project.dataset.table" {
-		t.Fatalf("unexpected bq table path: got %q", current.BQTablePath)
+	if current.BQURI != "project.dataset.table" {
+		t.Fatalf("unexpected bq uri: got %q", current.BQURI)
 	}
 
 	if current.IsDetailedBilling == nil || !*current.IsDetailedBilling {
