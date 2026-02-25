@@ -163,7 +163,7 @@ func NewClient(baseURL, slug, token string, httpClient httpDoer) *Client {
 
 // GetServiceAccount fetches service-account data for the configured Costory tenant.
 func (c *Client) GetServiceAccount(ctx context.Context) (*ServiceAccountResponse, error) {
-	body, statusCode, err := doEndpoint(c, ctx, endpointGetServiceAccount, noRequest{})
+	body, statusCode, err := doEndpoint(ctx, c, endpointGetServiceAccount, noRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (c *Client) GetServiceAccount(ctx context.Context) (*ServiceAccountResponse
 
 // ValidateGCPBillingDatasource validates a GCP billing datasource before creation.
 func (c *Client) ValidateGCPBillingDatasource(ctx context.Context, req GCPBillingDatasourceRequest) error {
-	body, statusCode, err := doEndpoint(c, ctx, endpointValidateGCPBillingDatasource, req.toAPIRequest())
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateGCPBillingDatasource, req.toAPIRequest())
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (c *Client) ValidateGCPBillingDatasource(ctx context.Context, req GCPBillin
 
 // CreateGCPBillingDatasource creates a GCP billing datasource and returns its API representation.
 func (c *Client) CreateGCPBillingDatasource(ctx context.Context, req GCPBillingDatasourceRequest) (*GCPBillingDatasource, error) {
-	body, statusCode, err := doEndpoint(c, ctx, endpointCreateGCPBillingDatasource, req.toAPIRequest())
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateGCPBillingDatasource, req.toAPIRequest())
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (c *Client) CreateGCPBillingDatasource(ctx context.Context, req GCPBillingD
 // GetGCPBillingDatasource gets a GCP billing datasource by ID.
 func (c *Client) GetGCPBillingDatasource(ctx context.Context, datasourceID string) (*GCPBillingDatasource, error) {
 	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
-	body, statusCode, err := doEndpointWithRouteParams(c, ctx, endpointGetGCPBillingDatasourceByID, routeParams, noRequest{})
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetGCPBillingDatasourceByID, routeParams, noRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (c *Client) GetGCPBillingDatasource(ctx context.Context, datasourceID strin
 
 // ValidateAWSBillingDatasource validates an AWS billing datasource before creation.
 func (c *Client) ValidateAWSBillingDatasource(ctx context.Context, req AWSBillingDatasourceRequest) error {
-	body, statusCode, err := doEndpoint(c, ctx, endpointValidateAWSBillingDatasource, req.toAPIRequest())
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateAWSBillingDatasource, req.toAPIRequest())
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (c *Client) ValidateAWSBillingDatasource(ctx context.Context, req AWSBillin
 
 // CreateAWSBillingDatasource creates an AWS billing datasource and returns its API representation.
 func (c *Client) CreateAWSBillingDatasource(ctx context.Context, req AWSBillingDatasourceRequest) (*AWSBillingDatasource, error) {
-	body, statusCode, err := doEndpoint(c, ctx, endpointCreateAWSBillingDatasource, req.toAPIRequest())
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateAWSBillingDatasource, req.toAPIRequest())
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func (c *Client) CreateAWSBillingDatasource(ctx context.Context, req AWSBillingD
 // GetAWSBillingDatasource gets an AWS billing datasource by ID.
 func (c *Client) GetAWSBillingDatasource(ctx context.Context, datasourceID string) (*AWSBillingDatasource, error) {
 	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
-	body, statusCode, err := doEndpointWithRouteParams(c, ctx, endpointGetAWSBillingDatasourceByID, routeParams, noRequest{})
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetAWSBillingDatasourceByID, routeParams, noRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func (c *Client) GetAWSBillingDatasource(ctx context.Context, datasourceID strin
 // DeleteBillingDatasource deletes a billing datasource by ID.
 func (c *Client) DeleteBillingDatasource(ctx context.Context, datasourceID string) error {
 	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
-	body, statusCode, err := doEndpointWithRouteParams(c, ctx, endpointDeleteBillingDatasourceByID, routeParams, noRequest{})
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointDeleteBillingDatasourceByID, routeParams, noRequest{})
 	if err != nil {
 		return err
 	}
@@ -346,8 +346,8 @@ func (c *Client) endpoint(path string) string {
 }
 
 func doEndpoint[TReq any, TResp any](
-	c *Client,
 	ctx context.Context,
+	c *Client,
 	endpoint endpointContract[TReq, TResp],
 	request TReq,
 ) ([]byte, int, error) {
@@ -362,8 +362,8 @@ func doEndpoint[TReq any, TResp any](
 }
 
 func doEndpointWithRouteParams[TParams any, TReq any, TResp any](
-	c *Client,
 	ctx context.Context,
+	c *Client,
 	endpoint endpointWithRouteParamsContract[TParams, TReq, TResp],
 	params TParams,
 	request TReq,
