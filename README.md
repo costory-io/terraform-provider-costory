@@ -18,6 +18,7 @@ Install:
 - [Go](https://go.dev/doc/install) `>= 1.24`
 - [Terraform CLI](https://developer.hashicorp.com/terraform/downloads)
 - [golangci-lint](https://golangci-lint.run/welcome/install/) (for local linting)
+- [`tfplugindocs`](https://github.com/hashicorp/terraform-plugin-docs) (optional locally; script installs via `go run`)
 
 ---
 
@@ -58,6 +59,16 @@ go vet ./...
 go test ./...
 go build ./...
 ```
+
+Generate Terraform provider docs:
+
+```bash
+scripts/generate-docs.sh
+```
+
+The CI pipeline validates that docs are generated and committed. Any schema change
+under `internal/provider/` should be followed by regenerating docs and committing
+the updated `docs/` files.
 
 ---
 
