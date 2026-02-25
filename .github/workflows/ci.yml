@@ -44,5 +44,11 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Generate Terraform provider docs
+        run: scripts/generate-docs.sh
+
+      - name: Verify generated docs are committed
+        run: git diff --exit-code
+
       - name: Build
         run: go build ./...
