@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.vscode/
+bin/
+dist/
+*.log
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+.env
+*.env
