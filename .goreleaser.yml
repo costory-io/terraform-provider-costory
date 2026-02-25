@@ -1,6 +1,5 @@
-# Visit https://goreleaser.com for documentation on how to customize this
-# behavior.
 version: 2
+project_name: terraform-provider-costory
 before:
   hooks:
     # this is just an example and not a requirement for provider building/publishing
@@ -45,7 +44,7 @@ checksum:
 signs:
   - artifacts: checksum
     args:
-      # if you are using this in a GitHub action or some other automated pipeline, you 
+      # if you are using this in a GitHub action or some other automated pipeline, you
       # need to pass the batch flag to indicate its not interactive.
       - "--batch"
       - "--local-user"

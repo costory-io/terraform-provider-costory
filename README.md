@@ -61,6 +61,19 @@ go build ./...
 
 ---
 
+## Create a release
+
+Create a signed tag and GitHub release:
+
+```bash
+scripts/release.sh v0.1.0
+```
+
+The script verifies that your working tree is clean, creates a signed tag, pushes
+it to `origin`, and creates a GitHub release with generated notes.
+
+---
+
 ## Example usage
 
 This minimal example is self-contained:
