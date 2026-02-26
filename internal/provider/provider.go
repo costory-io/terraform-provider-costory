@@ -17,7 +17,7 @@ import (
 	"github.com/costory-io/costory-terraform/internal/provider/billingdatasource"
 )
 
-const defaultBaseURL = "https://app.costory.io"
+const defaultBaseURL = "https://app-api.costory.io"
 
 var (
 	_ provider.Provider = &costoryProvider{}
@@ -56,7 +56,7 @@ func (p *costoryProvider) Schema(_ context.Context, _ provider.SchemaRequest, re
 				Sensitive:           true,
 			},
 			"base_url": schema.StringAttribute{
-				MarkdownDescription: "Costory API base URL. Defaults to `https://app.costory.io`.",
+				MarkdownDescription: "Costory API base URL",
 				Optional:            true,
 			},
 		},
