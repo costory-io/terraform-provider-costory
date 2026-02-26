@@ -20,7 +20,7 @@ variable "s3_name" {
 variable "s3_prefix" {
   type        = string
   description = "The S3 prefix for the CUR exports."
-  default     = "costory-cur/"
+  default     = "costory-cur"
 }
 
 variable "aws_region" {
