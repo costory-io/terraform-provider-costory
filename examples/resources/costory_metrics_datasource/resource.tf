@@ -48,13 +48,28 @@ resource "costory_metrics_datasource_s3_parquet" "main" {
     dimensions   = ["service", "region"]
     unit         = "count"
   }
+}
+
+resource "costory_metrics_datasource_s3_parquet" "main" {
+  name        = "Multiple metrics"
+  bucket_name = var.s3_bucket_name
+  prefix      = var.s3_prefix
+  role_arn    = var.role_arn
 
   metrics_definition {
-    metric_name  = "Cost"
+    metric_name  = "Nbr pof R&D teams"
     gap_filling  = "FORWARD_FILL"
-    aggregation  = "Average"
-    value_column = "unblended_cost"
+    aggregation  = "SUM"
+    value_column = "nbr_rd_teams"
     date_column  = "usage_start_date"
-    dimensions   = ["service"]
+    unit         = "count"
+  }
+  metrics_definition {
+    metric_name  = "Organizations"
+    gap_filling  = "FORWARD_FILL"
+    aggregation  = "SUM"
+    value_column = "nbr_organizations"
+    date_column  = "usage_start_date"
+    unit         = "count"
   }
 }
