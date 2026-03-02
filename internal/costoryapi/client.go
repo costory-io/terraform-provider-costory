@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	billingDatasourceTypeGCP = "GCP"
-	billingDatasourceTypeAWS = "AWS"
-	maxRetryAttempts         = 4
-	maxResponseBodyBytes     = 1024 * 1024
+	billingDatasourceTypeGCP  = "GCP"
+	billingDatasourceTypeAWS  = "AWS"
+	metricsDatasourceTypeS3V2 = "AwsS3V2"
+	maxRetryAttempts          = 4
+	maxResponseBodyBytes      = 1024 * 1024
 )
 
 // ErrNotFound is returned when the requested Costory resource does not exist.
@@ -139,6 +140,78 @@ type awsBillingDatasourceAPIResponse struct {
 	StartDate           *string `json:"startDate"`
 	EndDate             *string `json:"endDate"`
 	EKSSplit            *bool   `json:"eksSplit"`
+}
+
+// MetricsDefinition is a single metric definition for an AwsS3V2 metrics datasource.
+type MetricsDefinition struct {
+	MetricName  string
+	GapFilling  string
+	Aggregation string
+	ValueColumn string
+	DateColumn  string
+	Dimensions  []string
+	Unit        string
+}
+
+// MetricsDatasourceRequest is the Terraform input used to create/validate a metrics datasource.
+type MetricsDatasourceRequest struct {
+	Name               string
+	Type               string
+	BucketName         string
+	Prefix             string
+	RoleARN            string
+	MetricsDefinitions []MetricsDefinition
+}
+
+// MetricsDatasource is the normalized metrics datasource payload returned by the Costory API.
+type MetricsDatasource struct {
+	ID                string
+	Type              string
+	Status            *string
+	Name              string
+	BucketName        string
+	Prefix            string
+	RoleARN           string
+	MetricsDefinition []MetricsDefinition
+}
+
+type metricsDefinitionAPI struct {
+	MetricName  string   `json:"metricName"`
+	GapFilling  string   `json:"gapFilling"`
+	Aggregation string   `json:"aggregation"`
+	ValueColumn string   `json:"valueColumn"`
+	DateColumn  string   `json:"dateColumn"`
+	Dimensions  []string `json:"dimensions,omitempty"`
+	Unit        string   `json:"unit,omitempty"`
+}
+
+type metricsDatasourceAPIRequest struct {
+	Type              string                 `json:"type"`
+	Name              string                 `json:"name"`
+	BucketName        string                 `json:"bucketName"`
+	Prefix            string                 `json:"prefix"`
+	RoleARN           string                 `json:"roleArn"`
+	MetricsDefinition []metricsDefinitionAPI `json:"metricsDefinition"`
+}
+
+type metricsDatasourceAPIResponse struct {
+	ID                string                 `json:"id"`
+	Type              string                 `json:"type"`
+	Status            *string                `json:"status"`
+	Name              string                 `json:"name"`
+	BucketName        string                 `json:"bucketName"`
+	Prefix            string                 `json:"prefix"`
+	RoleARN           string                 `json:"roleArn"`
+	MetricsDefinition []metricsDefinitionAPI `json:"metricsDefinition"`
+}
+
+type metricsDatasourcePatchAPIRequest struct {
+	MetricsDefinition []metricsDefinitionAPI `json:"metricsDefinition"`
+}
+
+type metricsDatasourceValidateAPIResponse struct {
+	IsSuccess bool     `json:"isSuccess"`
+	Errors    []string `json:"errors"`
 }
 
 type apiErrorResponse struct {
@@ -338,6 +411,126 @@ func (c *Client) DeleteBillingDatasource(ctx context.Context, datasourceID strin
 	return unexpectedStatusError(statusCode, body)
 }
 
+// ValidateMetricsDatasource validates a metrics datasource before create/update.
+// If the API returns isSuccess=false, returns an error with the errors[] joined.
+func (c *Client) ValidateMetricsDatasource(ctx context.Context, req MetricsDatasourceRequest) error {
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateMetricsDatasource, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return unexpectedStatusError(statusCode, body)
+	}
+
+	var out metricsDatasourceValidateAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return fmt.Errorf("decode validation response: %w", err)
+	}
+
+	if out.IsSuccess {
+		return nil
+	}
+
+	if len(out.Errors) > 0 {
+		return fmt.Errorf("validation failed: %s", strings.Join(out.Errors, "; "))
+	}
+
+	return fmt.Errorf("validation failed")
+}
+
+// CreateMetricsDatasource creates a metrics datasource and returns its API representation.
+func (c *Client) CreateMetricsDatasource(ctx context.Context, req MetricsDatasourceRequest) (*MetricsDatasource, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateMetricsDatasource, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out metricsDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toMetricsDatasource()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include datasource id")
+	}
+
+	return normalized, nil
+}
+
+// GetMetricsDatasource gets a metrics datasource by ID.
+func (c *Client) GetMetricsDatasource(ctx context.Context, datasourceID string) (*MetricsDatasource, error) {
+	routeParams := metricsDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetMetricsDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out metricsDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toMetricsDatasource()
+	if normalized.ID == "" {
+		normalized.ID = datasourceID
+	}
+
+	return normalized, nil
+}
+
+// UpdateMetricsDatasource updates a metrics datasource's metrics definition via PATCH.
+func (c *Client) UpdateMetricsDatasource(ctx context.Context, datasourceID string, metricsDefinitions []MetricsDefinition) error {
+	routeParams := metricsDatasourceByIDRouteParams{ID: datasourceID}
+	patchReq := metricsDefinitionsToPatchRequest(metricsDefinitions)
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointPatchMetricsDatasourceByID, routeParams, patchReq)
+	if err != nil {
+		return err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// DeleteMetricsDatasource deletes a metrics datasource by ID.
+func (c *Client) DeleteMetricsDatasource(ctx context.Context, datasourceID string) error {
+	routeParams := metricsDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointDeleteMetricsDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	if statusCode == http.StatusNoContent || statusCode == http.StatusOK {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
 func (c *Client) endpoint(path string) string {
 	base := strings.TrimRight(c.baseURL, "/")
 	return base + "/" + strings.TrimLeft(path, "/")
@@ -486,6 +679,54 @@ func (r awsBillingDatasourceAPIResponse) toAWSBillingDatasource() *AWSBillingDat
 		StartDate:           r.StartDate,
 		EndDate:             r.EndDate,
 		EKSSplit:            r.EKSSplit,
+	}
+}
+
+func (r MetricsDatasourceRequest) toAPIRequest() metricsDatasourceAPIRequest {
+	defs := make([]metricsDefinitionAPI, len(r.MetricsDefinitions))
+	for i, d := range r.MetricsDefinitions {
+		defs[i] = metricsDefinitionAPI(d)
+	}
+	return metricsDatasourceAPIRequest{
+		Type:              r.Type,
+		Name:              r.Name,
+		BucketName:        r.BucketName,
+		Prefix:            r.Prefix,
+		RoleARN:           r.RoleARN,
+		MetricsDefinition: defs,
+	}
+}
+
+func metricsDefinitionsToPatchRequest(defs []MetricsDefinition) metricsDatasourcePatchAPIRequest {
+	apiDefs := make([]metricsDefinitionAPI, len(defs))
+	for i, d := range defs {
+		apiDefs[i] = metricsDefinitionAPI(d)
+	}
+	return metricsDatasourcePatchAPIRequest{MetricsDefinition: apiDefs}
+}
+
+func (r metricsDatasourceAPIResponse) toMetricsDatasource() *MetricsDatasource {
+	defs := make([]MetricsDefinition, len(r.MetricsDefinition))
+	for i, d := range r.MetricsDefinition {
+		defs[i] = MetricsDefinition{
+			MetricName:  d.MetricName,
+			GapFilling:  d.GapFilling,
+			Aggregation: d.Aggregation,
+			ValueColumn: d.ValueColumn,
+			DateColumn:  d.DateColumn,
+			Dimensions:  append([]string(nil), d.Dimensions...),
+			Unit:        d.Unit,
+		}
+	}
+	return &MetricsDatasource{
+		ID:                r.ID,
+		Type:              r.Type,
+		Status:            r.Status,
+		Name:              r.Name,
+		BucketName:        r.BucketName,
+		Prefix:            r.Prefix,
+		RoleARN:           r.RoleARN,
+		MetricsDefinition: defs,
 	}
 }
 

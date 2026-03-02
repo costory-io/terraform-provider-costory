@@ -9,6 +9,8 @@ const (
 	routeServiceAccount            = "/terraform/"
 	routeBillingDatasourceBase     = "/terraform/billingDatasources"
 	routeBillingDatasourceValidate = "/terraform/billingDatasources/validate"
+	routeMetricsDatasourceBase     = "/terraform/metricsDatasources"
+	routeMetricsDatasourceValidate = "/terraform/metricsDatasources/validate"
 )
 
 type requestTransport string
@@ -23,6 +25,10 @@ type noRequest struct{}
 type noResponse struct{}
 
 type billingDatasourceByIDRouteParams struct {
+	ID string
+}
+
+type metricsDatasourceByIDRouteParams struct {
 	ID string
 }
 
@@ -90,10 +96,51 @@ var endpointDeleteBillingDatasourceByID = endpointWithRouteParamsContract[billin
 	RequestBodyTransport: requestTransportNone,
 }
 
+var endpointValidateMetricsDatasource = endpointContract[metricsDatasourceAPIRequest, metricsDatasourceValidateAPIResponse]{
+	Method:           http.MethodPost,
+	Path:             routeMetricsDatasourceValidate,
+	RequestTransport: requestTransportJSONBody,
+}
+
+var endpointCreateMetricsDatasource = endpointContract[metricsDatasourceAPIRequest, metricsDatasourceAPIResponse]{
+	Method:           http.MethodPost,
+	Path:             routeMetricsDatasourceBase,
+	RequestTransport: requestTransportJSONBody,
+}
+
+var endpointGetMetricsDatasourceByID = endpointWithRouteParamsContract[metricsDatasourceByIDRouteParams, noRequest, metricsDatasourceAPIResponse]{
+	Method:               http.MethodGet,
+	Path:                 routeMetricsDatasourceByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
+var endpointPatchMetricsDatasourceByID = endpointWithRouteParamsContract[metricsDatasourceByIDRouteParams, metricsDatasourcePatchAPIRequest, noResponse]{
+	Method:               http.MethodPatch,
+	Path:                 routeMetricsDatasourceByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportJSONBody,
+}
+
+var endpointDeleteMetricsDatasourceByID = endpointWithRouteParamsContract[metricsDatasourceByIDRouteParams, noRequest, noResponse]{
+	Method:               http.MethodDelete,
+	Path:                 routeMetricsDatasourceByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
 func routeBillingDatasourceByID(id string) string {
 	return routeBillingDatasourceBase + "/" + url.PathEscape(id)
 }
 
 func routeBillingDatasourceByIDFromParams(params billingDatasourceByIDRouteParams) string {
 	return routeBillingDatasourceByID(params.ID)
+}
+
+func routeMetricsDatasourceByID(id string) string {
+	return routeMetricsDatasourceBase + "/" + url.PathEscape(id)
+}
+
+func routeMetricsDatasourceByIDFromParams(params metricsDatasourceByIDRouteParams) string {
+	return routeMetricsDatasourceByID(params.ID)
 }
