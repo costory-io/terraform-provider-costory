@@ -136,6 +136,8 @@ func (r *metricsDatasourceResource) Schema(_ context.Context, _ resource.SchemaR
 						},
 						"unit": schema.StringAttribute{
 							Optional:            true,
+							Computed:            true,
+							Default:             stringdefault.StaticString("count"),
 							MarkdownDescription: "Unit label for the metric.",
 						},
 					},
