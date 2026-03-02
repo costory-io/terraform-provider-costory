@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	billingDatasourceTypeGCP   = "GCP"
-	billingDatasourceTypeAWS   = "AWS"
-	metricsDatasourceTypeS3V2  = "AwsS3V2"
-	maxRetryAttempts           = 4
-	maxResponseBodyBytes       = 1024 * 1024
+	billingDatasourceTypeGCP  = "GCP"
+	billingDatasourceTypeAWS  = "AWS"
+	metricsDatasourceTypeS3V2 = "AwsS3V2"
+	maxRetryAttempts          = 4
+	maxResponseBodyBytes      = 1024 * 1024
 )
 
 // ErrNotFound is returned when the requested Costory resource does not exist.
@@ -186,11 +186,11 @@ type metricsDefinitionAPI struct {
 }
 
 type metricsDatasourceAPIRequest struct {
-	Type               string                 `json:"type"`
-	Name               string                 `json:"name"`
-	BucketName         string                 `json:"bucketName"`
-	Prefix             string                 `json:"prefix"`
-	RoleARN            string                 `json:"roleArn"`
+	Type              string                 `json:"type"`
+	Name              string                 `json:"name"`
+	BucketName        string                 `json:"bucketName"`
+	Prefix            string                 `json:"prefix"`
+	RoleARN           string                 `json:"roleArn"`
 	MetricsDefinition []metricsDefinitionAPI `json:"metricsDefinition"`
 }
 
@@ -685,22 +685,14 @@ func (r awsBillingDatasourceAPIResponse) toAWSBillingDatasource() *AWSBillingDat
 func (r MetricsDatasourceRequest) toAPIRequest() metricsDatasourceAPIRequest {
 	defs := make([]metricsDefinitionAPI, len(r.MetricsDefinitions))
 	for i, d := range r.MetricsDefinitions {
-		defs[i] = metricsDefinitionAPI{
-			MetricName:  d.MetricName,
-			GapFilling:  d.GapFilling,
-			Aggregation: d.Aggregation,
-			ValueColumn: d.ValueColumn,
-			DateColumn:  d.DateColumn,
-			Dimensions:  d.Dimensions,
-			Unit:        d.Unit,
-		}
+		defs[i] = metricsDefinitionAPI(d)
 	}
 	return metricsDatasourceAPIRequest{
-		Type:               r.Type,
-		Name:               r.Name,
-		BucketName:         r.BucketName,
-		Prefix:             r.Prefix,
-		RoleARN:            r.RoleARN,
+		Type:              r.Type,
+		Name:              r.Name,
+		BucketName:        r.BucketName,
+		Prefix:            r.Prefix,
+		RoleARN:           r.RoleARN,
 		MetricsDefinition: defs,
 	}
 }
@@ -708,15 +700,7 @@ func (r MetricsDatasourceRequest) toAPIRequest() metricsDatasourceAPIRequest {
 func metricsDefinitionsToPatchRequest(defs []MetricsDefinition) metricsDatasourcePatchAPIRequest {
 	apiDefs := make([]metricsDefinitionAPI, len(defs))
 	for i, d := range defs {
-		apiDefs[i] = metricsDefinitionAPI{
-			MetricName:  d.MetricName,
-			GapFilling:  d.GapFilling,
-			Aggregation: d.Aggregation,
-			ValueColumn: d.ValueColumn,
-			DateColumn:  d.DateColumn,
-			Dimensions:  d.Dimensions,
-			Unit:        d.Unit,
-		}
+		apiDefs[i] = metricsDefinitionAPI(d)
 	}
 	return metricsDatasourcePatchAPIRequest{MetricsDefinition: apiDefs}
 }

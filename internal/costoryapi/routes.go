@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	routeServiceAccount               = "/terraform/"
-	routeBillingDatasourceBase        = "/terraform/billingDatasources"
-	routeBillingDatasourceValidate    = "/terraform/billingDatasources/validate"
-	routeMetricsDatasourceBase        = "/terraform/metricsDatasources"
-	routeMetricsDatasourceValidate    = "/terraform/metricsDatasources/validate"
+	routeServiceAccount            = "/terraform/"
+	routeBillingDatasourceBase     = "/terraform/billingDatasources"
+	routeBillingDatasourceValidate = "/terraform/billingDatasources/validate"
+	routeMetricsDatasourceBase     = "/terraform/metricsDatasources"
+	routeMetricsDatasourceValidate = "/terraform/metricsDatasources/validate"
 )
 
 type requestTransport string
