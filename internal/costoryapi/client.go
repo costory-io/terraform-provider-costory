@@ -13,11 +13,13 @@ import (
 )
 
 const (
-	billingDatasourceTypeGCP  = "GCP"
-	billingDatasourceTypeAWS  = "AWS"
-	metricsDatasourceTypeS3V2 = "AwsS3V2"
-	maxRetryAttempts          = 4
-	maxResponseBodyBytes      = 1024 * 1024
+	billingDatasourceTypeGCP       = "GCP"
+	billingDatasourceTypeAWS       = "AWS"
+	billingDatasourceTypeCursor    = "Cursor"
+	billingDatasourceTypeAnthropic = "Anthropic"
+	metricsDatasourceTypeS3V2      = "AwsS3V2"
+	maxRetryAttempts               = 4
+	maxResponseBodyBytes           = 1024 * 1024
 )
 
 // ErrNotFound is returned when the requested Costory resource does not exist.
@@ -96,6 +98,44 @@ type AWSBillingDatasource struct {
 	EKSSplit            *bool
 }
 
+// CursorBillingDatasourceRequest is the Terraform input used to create/validate a Cursor billing datasource.
+type CursorBillingDatasourceRequest struct {
+	Name        string
+	AdminAPIKey string
+	StartDate   *string
+	EndDate     *string
+}
+
+// CursorBillingDatasource is the normalized datasource payload returned by the Costory API.
+type CursorBillingDatasource struct {
+	ID         string
+	Type       string
+	Status     *string
+	Name       string
+	BQTableURI string
+	StartDate  *string
+	EndDate    *string
+}
+
+// AnthropicBillingDatasourceRequest is the Terraform input used to create/validate an Anthropic billing datasource.
+type AnthropicBillingDatasourceRequest struct {
+	Name        string
+	AdminAPIKey string
+	StartDate   *string
+	EndDate     *string
+}
+
+// AnthropicBillingDatasource is the normalized datasource payload returned by the Costory API.
+type AnthropicBillingDatasource struct {
+	ID         string
+	Type       string
+	Status     *string
+	Name       string
+	BQTableURI string
+	StartDate  *string
+	EndDate    *string
+}
+
 type gcpBillingDatasourceAPIRequest struct {
 	Type              string  `json:"type"`
 	Name              string  `json:"name"`
@@ -140,6 +180,24 @@ type awsBillingDatasourceAPIResponse struct {
 	StartDate           *string `json:"startDate"`
 	EndDate             *string `json:"endDate"`
 	EKSSplit            *bool   `json:"eksSplit"`
+}
+
+type externalBillingDatasourceAPIRequest struct {
+	Type        string  `json:"type"`
+	Name        string  `json:"name"`
+	AdminAPIKey string  `json:"adminApiKey"`
+	StartDate   *string `json:"startDate,omitempty"`
+	EndDate     *string `json:"endDate,omitempty"`
+}
+
+type externalBillingDatasourceAPIResponse struct {
+	ID         string  `json:"id"`
+	Type       string  `json:"type"`
+	Status     *string `json:"status"`
+	Name       string  `json:"name"`
+	BQTableURI string  `json:"bqTableUri"`
+	StartDate  *string `json:"startDate"`
+	EndDate    *string `json:"endDate"`
 }
 
 // MetricsDefinition is a single metric definition for an AwsS3V2 metrics datasource.
@@ -385,6 +443,140 @@ func (c *Client) GetAWSBillingDatasource(ctx context.Context, datasourceID strin
 	}
 
 	normalized := out.toAWSBillingDatasource()
+	if normalized.ID == "" {
+		normalized.ID = datasourceID
+	}
+
+	return normalized, nil
+}
+
+// ValidateCursorBillingDatasource validates a Cursor billing datasource before creation.
+func (c *Client) ValidateCursorBillingDatasource(ctx context.Context, req CursorBillingDatasourceRequest) error {
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateCursorBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// CreateCursorBillingDatasource creates a Cursor billing datasource and returns its API representation.
+func (c *Client) CreateCursorBillingDatasource(ctx context.Context, req CursorBillingDatasourceRequest) (*CursorBillingDatasource, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateCursorBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out externalBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toCursorBillingDatasource()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include datasource id")
+	}
+
+	return normalized, nil
+}
+
+// GetCursorBillingDatasource gets a Cursor billing datasource by ID.
+func (c *Client) GetCursorBillingDatasource(ctx context.Context, datasourceID string) (*CursorBillingDatasource, error) {
+	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetCursorBillingDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out externalBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toCursorBillingDatasource()
+	if normalized.ID == "" {
+		normalized.ID = datasourceID
+	}
+
+	return normalized, nil
+}
+
+// ValidateAnthropicBillingDatasource validates an Anthropic billing datasource before creation.
+func (c *Client) ValidateAnthropicBillingDatasource(ctx context.Context, req AnthropicBillingDatasourceRequest) error {
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateAnthropicBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// CreateAnthropicBillingDatasource creates an Anthropic billing datasource and returns its API representation.
+func (c *Client) CreateAnthropicBillingDatasource(ctx context.Context, req AnthropicBillingDatasourceRequest) (*AnthropicBillingDatasource, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateAnthropicBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out externalBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toAnthropicBillingDatasource()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include datasource id")
+	}
+
+	return normalized, nil
+}
+
+// GetAnthropicBillingDatasource gets an Anthropic billing datasource by ID.
+func (c *Client) GetAnthropicBillingDatasource(ctx context.Context, datasourceID string) (*AnthropicBillingDatasource, error) {
+	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetAnthropicBillingDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out externalBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toAnthropicBillingDatasource()
 	if normalized.ID == "" {
 		normalized.ID = datasourceID
 	}
@@ -653,6 +845,26 @@ func (r AWSBillingDatasourceRequest) toAPIRequest() awsBillingDatasourceAPIReque
 	}
 }
 
+func (r CursorBillingDatasourceRequest) toAPIRequest() externalBillingDatasourceAPIRequest {
+	return externalBillingDatasourceAPIRequest{
+		Type:        billingDatasourceTypeCursor,
+		Name:        r.Name,
+		AdminAPIKey: r.AdminAPIKey,
+		StartDate:   r.StartDate,
+		EndDate:     r.EndDate,
+	}
+}
+
+func (r AnthropicBillingDatasourceRequest) toAPIRequest() externalBillingDatasourceAPIRequest {
+	return externalBillingDatasourceAPIRequest{
+		Type:        billingDatasourceTypeAnthropic,
+		Name:        r.Name,
+		AdminAPIKey: r.AdminAPIKey,
+		StartDate:   r.StartDate,
+		EndDate:     r.EndDate,
+	}
+}
+
 func (r gcpBillingDatasourceAPIResponse) toGCPBillingDatasource() *GCPBillingDatasource {
 	return &GCPBillingDatasource{
 		ID:                r.ID,
@@ -679,6 +891,30 @@ func (r awsBillingDatasourceAPIResponse) toAWSBillingDatasource() *AWSBillingDat
 		StartDate:           r.StartDate,
 		EndDate:             r.EndDate,
 		EKSSplit:            r.EKSSplit,
+	}
+}
+
+func (r externalBillingDatasourceAPIResponse) toCursorBillingDatasource() *CursorBillingDatasource {
+	return &CursorBillingDatasource{
+		ID:         r.ID,
+		Type:       r.Type,
+		Status:     r.Status,
+		Name:       r.Name,
+		BQTableURI: r.BQTableURI,
+		StartDate:  r.StartDate,
+		EndDate:    r.EndDate,
+	}
+}
+
+func (r externalBillingDatasourceAPIResponse) toAnthropicBillingDatasource() *AnthropicBillingDatasource {
+	return &AnthropicBillingDatasource{
+		ID:         r.ID,
+		Type:       r.Type,
+		Status:     r.Status,
+		Name:       r.Name,
+		BQTableURI: r.BQTableURI,
+		StartDate:  r.StartDate,
+		EndDate:    r.EndDate,
 	}
 }
 
