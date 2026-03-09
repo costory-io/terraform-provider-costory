@@ -27,7 +27,7 @@ Creates a Costory Anthropic billing datasource.
 
 ### Read-Only
 
-- `bq_table_uri` (String) BigQuery table URI created by Costory for billing data.
+- `bq_table_uri` (String, Sensitive) BigQuery table URI created by Costory for billing data.
 - `id` (String) Billing datasource ID returned by Costory.
 - `status` (String) Datasource status returned by Costory.
 - `type` (String) Datasource type. Always `Anthropic` for this resource.

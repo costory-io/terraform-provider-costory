@@ -80,6 +80,7 @@ func (r *anthropicResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"bq_table_uri": schema.StringAttribute{
 				Computed:            true,
+				Sensitive:           true,
 				MarkdownDescription: "BigQuery table URI created by Costory for billing data.",
 			},
 			"start_date": schema.StringAttribute{
