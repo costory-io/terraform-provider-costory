@@ -129,6 +129,8 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		billingdatasource.NewGCPResource,
 		billingdatasource.NewAWSResource,
+		billingdatasource.NewCursorResource,
+		billingdatasource.NewAnthropicResource,
 		metricsdatasource.NewResource,
 	}
 }
