@@ -131,6 +131,7 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 		billingdatasource.NewAWSResource,
 		billingdatasource.NewCursorResource,
 		billingdatasource.NewAnthropicResource,
+		billingdatasource.NewAzureResource,
 		metricsdatasource.NewResource,
 	}
 }

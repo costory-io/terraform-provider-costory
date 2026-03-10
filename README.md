@@ -10,6 +10,7 @@ The provider currently supports:
   - service-account discovery (`data.costory_service_account`)
   - GCP billing datasource lifecycle (`resource.costory_billing_datasource_gcp`)
   - AWS billing datasource lifecycle (`resource.costory_billing_datasource_aws`)
+  - Azure billing datasource lifecycle (`resource.costory_azure_datasource`)
 
 ## Prerequisites
 
