@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_cursor Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory Cursor billing datasource.
+  Creates a Costory Cursor billing datasource. See the full documentation here https://docs.costory.io/setup/billing#cursor.
 ---
 
 # costory_billing_datasource_cursor (Resource)
 
-Creates a Costory Cursor billing datasource.
+Creates a Costory Cursor billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#cursor).
 
 ## Example Usage
 

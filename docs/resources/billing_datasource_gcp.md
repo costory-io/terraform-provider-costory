@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_gcp Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory GCP billing datasource.
+  Creates a Costory GCP billing datasource. See the full documentation here https://docs.costory.io/setup/billing#gcp.
 ---
 
 # costory_billing_datasource_gcp (Resource)
 
-Creates a Costory GCP billing datasource.
+Creates a Costory GCP billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#gcp).
 
 ## Example Usage
 

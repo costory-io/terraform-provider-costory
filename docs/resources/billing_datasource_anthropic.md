@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_anthropic Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory Anthropic billing datasource.
+  Creates a Costory Anthropic billing datasource. See the full documentation here https://docs.costory.io/setup/billing#anthropic.
 ---
 
 # costory_billing_datasource_anthropic (Resource)
 
-Creates a Costory Anthropic billing datasource.
+Creates a Costory Anthropic billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#anthropic).
 
 ## Example Usage
 

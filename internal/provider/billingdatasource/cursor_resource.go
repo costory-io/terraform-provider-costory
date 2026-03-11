@@ -48,7 +48,7 @@ func (r *cursorResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *cursorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Creates a Costory Cursor billing datasource.",
+		MarkdownDescription: "Creates a Costory Cursor billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#cursor).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

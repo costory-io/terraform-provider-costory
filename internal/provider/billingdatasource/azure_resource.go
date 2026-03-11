@@ -47,7 +47,7 @@ func (r *azureResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *azureResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Creates a Costory Azure billing datasource.",
+		MarkdownDescription: "Creates a Costory Azure billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#azure).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

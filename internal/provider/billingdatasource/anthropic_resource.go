@@ -48,7 +48,7 @@ func (r *anthropicResource) Metadata(_ context.Context, req resource.MetadataReq
 
 func (r *anthropicResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Creates a Costory Anthropic billing datasource.",
+		MarkdownDescription: "Creates a Costory Anthropic billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#anthropic).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

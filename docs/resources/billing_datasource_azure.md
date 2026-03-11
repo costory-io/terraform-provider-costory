@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_azure Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory Azure billing datasource.
+  Creates a Costory Azure billing datasource. See the full documentation here https://docs.costory.io/setup/billing#azure.
 ---
 
 # costory_billing_datasource_azure (Resource)
 
-Creates a Costory Azure billing datasource.
+Creates a Costory Azure billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#azure).
 
 ## Example Usage
 

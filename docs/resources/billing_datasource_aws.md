@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_aws Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory AWS billing datasource.
+  Creates a Costory AWS billing datasource. See the full documentation here https://docs.costory.io/setup/billing#aws.
 ---
 
 # costory_billing_datasource_aws (Resource)
 
-Creates a Costory AWS billing datasource.
+Creates a Costory AWS billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#aws).
 
 ## Example Usage
 
