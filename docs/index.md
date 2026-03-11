@@ -12,8 +12,14 @@ The Costory provider forwards API calls to the Costory app.
 ## Example Usage
 
 ```terraform
+variable "costory_api_token" {
+  type        = string
+  description = "Costory API token."
+  sensitive   = true
+}
+
 provider "costory" {
-  token = var.costory_token
+  token = var.costory_api_token
 }
 ```
 

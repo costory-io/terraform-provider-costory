@@ -7,7 +7,7 @@ terraform {
   }
 }
 
-variable "costory_token" {
+variable "costory_api_token" {
   type        = string
   description = "Costory API token."
   sensitive   = true
@@ -30,7 +30,7 @@ variable "role_arn" {
 }
 
 provider "costory" {
-  token = var.costory_token
+  token = var.costory_api_token
 }
 
 resource "costory_metrics_datasource_s3_parquet" "main" {

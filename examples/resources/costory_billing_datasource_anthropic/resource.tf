@@ -7,7 +7,7 @@ terraform {
   }
 }
 
-variable "costory_token" {
+variable "costory_api_token" {
   type        = string
   description = "Costory API token."
   sensitive   = true
@@ -20,7 +20,7 @@ variable "anthropic_admin_api_key" {
 }
 
 provider "costory" {
-  token = var.costory_token
+  token = var.costory_api_token
 }
 
 resource "costory_billing_datasource_anthropic" "main" {

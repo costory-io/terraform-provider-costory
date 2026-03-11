@@ -25,7 +25,7 @@ terraform {
   }
 }
 
-variable "costory_token" {
+variable "costory_api_token" {
   type        = string
   description = "Costory API token."
   sensitive   = true
@@ -78,7 +78,7 @@ provider "azurerm" {
 }
 
 provider "costory" {
-  token = var.costory_token
+  token = var.costory_api_token
 }
 
 resource "azurerm_resource_group" "cost_exports" {

@@ -13,10 +13,26 @@ Creates a Costory GCP billing datasource.
 ## Example Usage
 
 ```terraform
-provider "costory" {
-  token = var.costory_token
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 5.0"
+    }
+    costory = {
+      source  = "costory-io/costory"
+      version = ">= 0.1.0"
+    }
+  }
 }
-
+variable "costory_api_token" {
+  type        = string
+  description = "Costory API token."
+  sensitive   = true
+}
+provider "costory" {
+  token = var.costory_api_token
+}
 data "costory_service_account" "current" {}
 
 locals {
