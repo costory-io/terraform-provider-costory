@@ -17,5 +17,6 @@ for f in "${docs_dir}"/*.md; do
     metrics_datasource_*) subcategory="Metrics Datasources" ;;
     *)                    continue ;;
   esac
-  sed -i"" "s/^subcategory: \".*\"/subcategory: \"${subcategory}\"/" "$f"
+  tmp="${f}.tmp"
+  sed "s/^subcategory: \".*\"/subcategory: \"${subcategory}\"/" "$f" > "$tmp" && mv "$tmp" "$f"
 done
