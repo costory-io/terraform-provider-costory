@@ -42,7 +42,7 @@ func NewAzureResource() resource.Resource {
 }
 
 func (r *azureResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = fmt.Sprintf("%s_azure_datasource", req.ProviderTypeName)
+	resp.TypeName = fmt.Sprintf("%s_billing_datasource_azure", req.ProviderTypeName)
 }
 
 func (r *azureResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -201,7 +201,7 @@ func (r *azureResource) Read(ctx context.Context, req resource.ReadRequest, resp
 func (r *azureResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError(
 		"Update not supported",
-		"All attributes are immutable for costory_azure_datasource. Terraform should replace the resource instead.",
+		"All attributes are immutable for costory_billing_datasource_azure. Terraform should replace the resource instead.",
 	)
 }
 

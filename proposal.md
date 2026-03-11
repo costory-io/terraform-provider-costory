@@ -6,7 +6,7 @@ using the `/terraform/billingDatasources` and `/terraform/billingDatasources/val
 API endpoints.
 
 ### Planned changes
-- Add `costory_azure_datasource` resource mapping to the Azure payload.
+- Add `costory_billing_datasource_azure` resource mapping to the Azure payload.
 - Extend the Costory API client with request/response types and methods for
   Azure create/validate/get/delete flows.
 - Mark `sas_url` as sensitive and ForceNew for all fields (no update endpoint).
