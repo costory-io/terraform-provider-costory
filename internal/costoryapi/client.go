@@ -17,6 +17,7 @@ const (
 	billingDatasourceTypeAWS       = "AWS"
 	billingDatasourceTypeCursor    = "Cursor"
 	billingDatasourceTypeAnthropic = "Anthropic"
+	billingDatasourceTypeAzure     = "Azure"
 	metricsDatasourceTypeS3V2      = "AwsS3V2"
 	maxRetryAttempts               = 4
 	maxResponseBodyBytes           = 1024 * 1024
@@ -136,6 +137,28 @@ type AnthropicBillingDatasource struct {
 	EndDate    *string
 }
 
+// AzureBillingDatasourceRequest is the Terraform input used to create/validate an Azure billing datasource.
+type AzureBillingDatasourceRequest struct {
+	Name               string
+	SASURL             string
+	StorageAccountName string
+	ContainerName      string
+	ActualsPath        string
+	AmortizedPath      string
+}
+
+// AzureBillingDatasource is the normalized datasource payload returned by the Costory API.
+type AzureBillingDatasource struct {
+	ID                 string
+	Type               string
+	Status             *string
+	Name               string
+	StorageAccountName string
+	ContainerName      string
+	ActualsPath        string
+	AmortizedPath      string
+}
+
 type gcpBillingDatasourceAPIRequest struct {
 	Type              string  `json:"type"`
 	Name              string  `json:"name"`
@@ -198,6 +221,27 @@ type externalBillingDatasourceAPIResponse struct {
 	BQTableURI string  `json:"bqTableUri"`
 	StartDate  *string `json:"startDate"`
 	EndDate    *string `json:"endDate"`
+}
+
+type azureBillingDatasourceAPIRequest struct {
+	Type               string `json:"type"`
+	Name               string `json:"name"`
+	SASURL             string `json:"sasUrl"`
+	StorageAccountName string `json:"storageAccountName"`
+	ContainerName      string `json:"containerName"`
+	ActualsPath        string `json:"actualsPath"`
+	AmortizedPath      string `json:"amortizedPath"`
+}
+
+type azureBillingDatasourceAPIResponse struct {
+	ID                 string  `json:"id"`
+	Type               string  `json:"type"`
+	Status             *string `json:"status"`
+	Name               string  `json:"name"`
+	StorageAccountName string  `json:"storageAccountName"`
+	ContainerName      string  `json:"containerName"`
+	ActualsPath        string  `json:"actualsPath"`
+	AmortizedPath      string  `json:"amortizedPath"`
 }
 
 // MetricsDefinition is a single metric definition for an AwsS3V2 metrics datasource.
@@ -584,6 +628,73 @@ func (c *Client) GetAnthropicBillingDatasource(ctx context.Context, datasourceID
 	return normalized, nil
 }
 
+// ValidateAzureBillingDatasource validates an Azure billing datasource before creation.
+func (c *Client) ValidateAzureBillingDatasource(ctx context.Context, req AzureBillingDatasourceRequest) error {
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateAzureBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// CreateAzureBillingDatasource creates an Azure billing datasource and returns its API representation.
+func (c *Client) CreateAzureBillingDatasource(ctx context.Context, req AzureBillingDatasourceRequest) (*AzureBillingDatasource, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateAzureBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out azureBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toAzureBillingDatasource()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include datasource id")
+	}
+
+	return normalized, nil
+}
+
+// GetAzureBillingDatasource gets an Azure billing datasource by ID.
+func (c *Client) GetAzureBillingDatasource(ctx context.Context, datasourceID string) (*AzureBillingDatasource, error) {
+	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetAzureBillingDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out azureBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toAzureBillingDatasource()
+	if normalized.ID == "" {
+		normalized.ID = datasourceID
+	}
+
+	return normalized, nil
+}
+
 // DeleteBillingDatasource deletes a billing datasource by ID.
 func (c *Client) DeleteBillingDatasource(ctx context.Context, datasourceID string) error {
 	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
@@ -865,6 +976,18 @@ func (r AnthropicBillingDatasourceRequest) toAPIRequest() externalBillingDatasou
 	}
 }
 
+func (r AzureBillingDatasourceRequest) toAPIRequest() azureBillingDatasourceAPIRequest {
+	return azureBillingDatasourceAPIRequest{
+		Type:               billingDatasourceTypeAzure,
+		Name:               r.Name,
+		SASURL:             r.SASURL,
+		StorageAccountName: r.StorageAccountName,
+		ContainerName:      r.ContainerName,
+		ActualsPath:        r.ActualsPath,
+		AmortizedPath:      r.AmortizedPath,
+	}
+}
+
 func (r gcpBillingDatasourceAPIResponse) toGCPBillingDatasource() *GCPBillingDatasource {
 	return &GCPBillingDatasource{
 		ID:                r.ID,
@@ -915,6 +1038,19 @@ func (r externalBillingDatasourceAPIResponse) toAnthropicBillingDatasource() *An
 		BQTableURI: r.BQTableURI,
 		StartDate:  r.StartDate,
 		EndDate:    r.EndDate,
+	}
+}
+
+func (r azureBillingDatasourceAPIResponse) toAzureBillingDatasource() *AzureBillingDatasource {
+	return &AzureBillingDatasource{
+		ID:                 r.ID,
+		Type:               r.Type,
+		Status:             r.Status,
+		Name:               r.Name,
+		StorageAccountName: r.StorageAccountName,
+		ContainerName:      r.ContainerName,
+		ActualsPath:        r.ActualsPath,
+		AmortizedPath:      r.AmortizedPath,
 	}
 }
 

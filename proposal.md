@@ -1,21 +1,19 @@
-## Proposal: Cursor + Anthropic billing datasources
+## Proposal: Azure billing datasource
 
 ### Goal
-Extend the Terraform provider to support Cursor and Anthropic billing datasources
-using the existing `/terraform/billingDatasources` and `/terraform/billingDatasources/validate`
+Extend the Terraform provider to support Azure billing datasources
+using the `/terraform/billingDatasources` and `/terraform/billingDatasources/validate`
 API endpoints.
 
 ### Planned changes
-- Add new billing datasource resources:
-  - `costory_billing_datasource_cursor`
-  - `costory_billing_datasource_anthropic`
+- Add `costory_billing_datasource_azure` resource mapping to the Azure payload.
 - Extend the Costory API client with request/response types and methods for
-  Cursor + Anthropic create/validate/get flows.
-- Mark `admin_api_key` as sensitive and optional `start_date`/`end_date` inputs.
-- Persist state attributes: `id`, `name`, `type`, `bq_table_uri`, `start_date`,
-  `end_date`, `status`.
-- Register the new resources in the provider.
-- Add API client tests and generate docs for the new resources.
+  Azure create/validate/get/delete flows.
+- Mark `sas_url` as sensitive and ForceNew for all fields (no update endpoint).
+- Persist state attributes: `id`, `name`, `type`, `storage_account_name`,
+  `container_name`, `actuals_path`, `amortized_path`, `status`.
+- Register the new resource in the provider.
+- Add acceptance tests for create/read/delete and validate.
 
 ### Validation
-- Run `go test ./...` (and regenerate docs if schema changes).
+- Run relevant acceptance tests for the Azure datasource.

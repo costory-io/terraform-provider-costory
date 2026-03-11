@@ -75,6 +75,12 @@ var endpointValidateAnthropicBillingDatasource = endpointContract[externalBillin
 	RequestTransport: requestTransportJSONBody,
 }
 
+var endpointValidateAzureBillingDatasource = endpointContract[azureBillingDatasourceAPIRequest, noResponse]{
+	Method:           http.MethodPost,
+	Path:             routeBillingDatasourceValidate,
+	RequestTransport: requestTransportJSONBody,
+}
+
 var endpointCreateGCPBillingDatasource = endpointContract[gcpBillingDatasourceAPIRequest, gcpBillingDatasourceAPIResponse]{
 	Method:           http.MethodPost,
 	Path:             routeBillingDatasourceBase,
@@ -94,6 +100,12 @@ var endpointCreateCursorBillingDatasource = endpointContract[externalBillingData
 }
 
 var endpointCreateAnthropicBillingDatasource = endpointContract[externalBillingDatasourceAPIRequest, externalBillingDatasourceAPIResponse]{
+	Method:           http.MethodPost,
+	Path:             routeBillingDatasourceBase,
+	RequestTransport: requestTransportJSONBody,
+}
+
+var endpointCreateAzureBillingDatasource = endpointContract[azureBillingDatasourceAPIRequest, azureBillingDatasourceAPIResponse]{
 	Method:           http.MethodPost,
 	Path:             routeBillingDatasourceBase,
 	RequestTransport: requestTransportJSONBody,
@@ -121,6 +133,13 @@ var endpointGetCursorBillingDatasourceByID = endpointWithRouteParamsContract[bil
 }
 
 var endpointGetAnthropicBillingDatasourceByID = endpointWithRouteParamsContract[billingDatasourceByIDRouteParams, noRequest, externalBillingDatasourceAPIResponse]{
+	Method:               http.MethodGet,
+	Path:                 routeBillingDatasourceByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
+var endpointGetAzureBillingDatasourceByID = endpointWithRouteParamsContract[billingDatasourceByIDRouteParams, noRequest, azureBillingDatasourceAPIResponse]{
 	Method:               http.MethodGet,
 	Path:                 routeBillingDatasourceByIDFromParams,
 	ParamsTransport:      requestTransportRouteParams,
