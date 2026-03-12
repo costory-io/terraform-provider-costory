@@ -11,6 +11,7 @@ const (
 	routeBillingDatasourceValidate = "/terraform/billingDatasources/validate"
 	routeMetricsDatasourceBase     = "/terraform/metricsDatasources"
 	routeMetricsDatasourceValidate = "/terraform/metricsDatasources/validate"
+	routeTeamsBase                 = "/terraform/teams"
 )
 
 type requestTransport string
@@ -30,6 +31,15 @@ type billingDatasourceByIDRouteParams struct {
 
 type metricsDatasourceByIDRouteParams struct {
 	ID string
+}
+
+type teamByIDRouteParams struct {
+	ID string
+}
+
+type teamMemberRouteParams struct {
+	TeamID string
+	UserID string
 }
 
 type endpointContract[Req any, Resp any] struct {
@@ -186,6 +196,47 @@ var endpointDeleteMetricsDatasourceByID = endpointWithRouteParamsContract[metric
 	RequestBodyTransport: requestTransportNone,
 }
 
+var endpointCreateTeam = endpointContract[teamCreateAPIRequest, teamAPIResponse]{
+	Method:           http.MethodPost,
+	Path:             routeTeamsBase,
+	RequestTransport: requestTransportJSONBody,
+}
+
+var endpointGetTeamByID = endpointWithRouteParamsContract[teamByIDRouteParams, noRequest, teamAPIResponse]{
+	Method:               http.MethodGet,
+	Path:                 routeTeamByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
+var endpointPatchTeamByID = endpointWithRouteParamsContract[teamByIDRouteParams, teamUpdateAPIRequest, teamAPIResponse]{
+	Method:               http.MethodPatch,
+	Path:                 routeTeamByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportJSONBody,
+}
+
+var endpointDeleteTeamByID = endpointWithRouteParamsContract[teamByIDRouteParams, noRequest, noResponse]{
+	Method:               http.MethodDelete,
+	Path:                 routeTeamByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
+var endpointAddTeamMember = endpointWithRouteParamsContract[teamByIDRouteParams, teamMemberAPIRequest, successResponse]{
+	Method:               http.MethodPost,
+	Path:                 routeTeamMembersByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportJSONBody,
+}
+
+var endpointRemoveTeamMember = endpointWithRouteParamsContract[teamMemberRouteParams, noRequest, successResponse]{
+	Method:               http.MethodDelete,
+	Path:                 routeTeamMemberByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
 func routeBillingDatasourceByID(id string) string {
 	return routeBillingDatasourceBase + "/" + url.PathEscape(id)
 }
@@ -200,4 +251,28 @@ func routeMetricsDatasourceByID(id string) string {
 
 func routeMetricsDatasourceByIDFromParams(params metricsDatasourceByIDRouteParams) string {
 	return routeMetricsDatasourceByID(params.ID)
+}
+
+func routeTeamByID(id string) string {
+	return routeTeamsBase + "/" + url.PathEscape(id)
+}
+
+func routeTeamByIDFromParams(params teamByIDRouteParams) string {
+	return routeTeamByID(params.ID)
+}
+
+func routeTeamMembersByID(teamID string) string {
+	return routeTeamByID(teamID) + "/members"
+}
+
+func routeTeamMembersByIDFromParams(params teamByIDRouteParams) string {
+	return routeTeamMembersByID(params.ID)
+}
+
+func routeTeamMemberByID(teamID, userID string) string {
+	return routeTeamMembersByID(teamID) + "/" + url.PathEscape(userID)
+}
+
+func routeTeamMemberByIDFromParams(params teamMemberRouteParams) string {
+	return routeTeamMemberByID(params.TeamID, params.UserID)
 }

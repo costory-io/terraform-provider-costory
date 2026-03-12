@@ -1,19 +1,19 @@
-## Proposal: Azure billing datasource
+## Proposal: Add Costory team management resources
 
 ### Goal
-Extend the Terraform provider to support Azure billing datasources
-using the `/terraform/billingDatasources` and `/terraform/billingDatasources/validate`
-API endpoints.
+Extend the Terraform provider to manage Costory Teams and team members using the
+`/terraform/teams` API endpoints.
 
 ### Planned changes
-- Add `costory_billing_datasource_azure` resource mapping to the Azure payload.
-- Extend the Costory API client with request/response types and methods for
-  Azure create/validate/get/delete flows.
-- Mark `sas_url` as sensitive and ForceNew for all fields (no update endpoint).
-- Persist state attributes: `id`, `name`, `type`, `storage_account_name`,
-  `container_name`, `actuals_path`, `amortized_path`, `status`.
-- Register the new resource in the provider.
-- Add acceptance tests for create/read/delete and validate.
+- Add Costory API client support for Teams (create/read/update/archive) and
+  team member mutations (add/remove).
+- Introduce a `costory_team` resource with `name`, `description`, `visibility`
+  and computed `id`, `created_at`, `updated_at` attributes.
+- Introduce a `costory_team_member` resource to add/remove a single member,
+  supporting either `user_id` or `email` plus optional `role`.
+- Register the new resources in the provider.
+- Regenerate docs under `docs/`.
 
 ### Validation
-- Run relevant acceptance tests for the Azure datasource.
+- Run `go test ./...`.
+- Run `scripts/generate-docs.sh` if schemas change.

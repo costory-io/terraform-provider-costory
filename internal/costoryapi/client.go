@@ -159,6 +159,37 @@ type AzureBillingDatasource struct {
 	AmortizedPath      string
 }
 
+// TeamCreateRequest is the Terraform input used to create a team.
+type TeamCreateRequest struct {
+	Name        string
+	Description *string
+	Visibility  *string
+}
+
+// TeamUpdateRequest is the Terraform input used to update a team.
+type TeamUpdateRequest struct {
+	Name        *string
+	Description *string
+	Visibility  *string
+}
+
+// Team is the normalized team payload returned by the Costory API.
+type Team struct {
+	ID          string
+	Name        string
+	Description string
+	Visibility  string
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+// TeamMemberRequest is the Terraform input used to add a team member.
+type TeamMemberRequest struct {
+	UserID *string
+	Email  *string
+	Role   *string
+}
+
 type gcpBillingDatasourceAPIRequest struct {
 	Type              string  `json:"type"`
 	Name              string  `json:"name"`
@@ -244,6 +275,33 @@ type azureBillingDatasourceAPIResponse struct {
 	AmortizedPath      string  `json:"amortizedPath"`
 }
 
+type teamCreateAPIRequest struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Visibility  *string `json:"visibility,omitempty"`
+}
+
+type teamUpdateAPIRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Visibility  *string `json:"visibility,omitempty"`
+}
+
+type teamMemberAPIRequest struct {
+	UserID *string `json:"userId,omitempty"`
+	Email  *string `json:"email,omitempty"`
+	Role   *string `json:"role,omitempty"`
+}
+
+type teamAPIResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
 // MetricsDefinition is a single metric definition for an AwsS3V2 metrics datasource.
 type MetricsDefinition struct {
 	MetricName  string
@@ -314,6 +372,10 @@ type metricsDatasourcePatchAPIRequest struct {
 type metricsDatasourceValidateAPIResponse struct {
 	IsSuccess bool     `json:"isSuccess"`
 	Errors    []string `json:"errors"`
+}
+
+type successResponse struct {
+	Success bool `json:"success"`
 }
 
 type apiErrorResponse struct {
@@ -695,6 +757,141 @@ func (c *Client) GetAzureBillingDatasource(ctx context.Context, datasourceID str
 	return normalized, nil
 }
 
+// CreateTeam creates a team and returns its API representation.
+func (c *Client) CreateTeam(ctx context.Context, req TeamCreateRequest) (*Team, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateTeam, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out teamAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toTeam()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include team id")
+	}
+
+	return normalized, nil
+}
+
+// GetTeam gets a team by ID.
+func (c *Client) GetTeam(ctx context.Context, teamID string) (*Team, error) {
+	routeParams := teamByIDRouteParams{ID: teamID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetTeamByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out teamAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toTeam()
+	if normalized.ID == "" {
+		normalized.ID = teamID
+	}
+
+	return normalized, nil
+}
+
+// UpdateTeam updates a team and returns its API representation.
+func (c *Client) UpdateTeam(ctx context.Context, teamID string, req TeamUpdateRequest) (*Team, error) {
+	routeParams := teamByIDRouteParams{ID: teamID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointPatchTeamByID, routeParams, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out teamAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toTeam()
+	if normalized.ID == "" {
+		normalized.ID = teamID
+	}
+
+	return normalized, nil
+}
+
+// DeleteTeam archives a team by ID.
+func (c *Client) DeleteTeam(ctx context.Context, teamID string) error {
+	routeParams := teamByIDRouteParams{ID: teamID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointDeleteTeamByID, routeParams, noRequest{})
+	if err != nil {
+		return err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// AddTeamMember adds a member to the team.
+func (c *Client) AddTeamMember(ctx context.Context, teamID string, req TeamMemberRequest) error {
+	routeParams := teamByIDRouteParams{ID: teamID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointAddTeamMember, routeParams, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// RemoveTeamMember removes a member from the team by user ID.
+func (c *Client) RemoveTeamMember(ctx context.Context, teamID, userID string) error {
+	routeParams := teamMemberRouteParams{TeamID: teamID, UserID: userID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointRemoveTeamMember, routeParams, noRequest{})
+	if err != nil {
+		return err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
 // DeleteBillingDatasource deletes a billing datasource by ID.
 func (c *Client) DeleteBillingDatasource(ctx context.Context, datasourceID string) error {
 	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
@@ -988,6 +1185,30 @@ func (r AzureBillingDatasourceRequest) toAPIRequest() azureBillingDatasourceAPIR
 	}
 }
 
+func (r TeamCreateRequest) toAPIRequest() teamCreateAPIRequest {
+	return teamCreateAPIRequest{
+		Name:        r.Name,
+		Description: r.Description,
+		Visibility:  r.Visibility,
+	}
+}
+
+func (r TeamUpdateRequest) toAPIRequest() teamUpdateAPIRequest {
+	return teamUpdateAPIRequest{
+		Name:        r.Name,
+		Description: r.Description,
+		Visibility:  r.Visibility,
+	}
+}
+
+func (r TeamMemberRequest) toAPIRequest() teamMemberAPIRequest {
+	return teamMemberAPIRequest{
+		UserID: r.UserID,
+		Email:  r.Email,
+		Role:   r.Role,
+	}
+}
+
 func (r gcpBillingDatasourceAPIResponse) toGCPBillingDatasource() *GCPBillingDatasource {
 	return &GCPBillingDatasource{
 		ID:                r.ID,
@@ -1051,6 +1272,17 @@ func (r azureBillingDatasourceAPIResponse) toAzureBillingDatasource() *AzureBill
 		ContainerName:      r.ContainerName,
 		ActualsPath:        r.ActualsPath,
 		AmortizedPath:      r.AmortizedPath,
+	}
+}
+
+func (r teamAPIResponse) toTeam() *Team {
+	return &Team{
+		ID:          r.ID,
+		Name:        r.Name,
+		Description: r.Description,
+		Visibility:  r.Visibility,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/costory-io/costory-terraform/internal/costoryapi"
 	"github.com/costory-io/costory-terraform/internal/provider/billingdatasource"
 	"github.com/costory-io/costory-terraform/internal/provider/metricsdatasource"
+	"github.com/costory-io/costory-terraform/internal/provider/team"
 )
 
 const defaultBaseURL = "https://app-api.costory.io"
@@ -133,5 +134,7 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 		billingdatasource.NewAnthropicResource,
 		billingdatasource.NewAzureResource,
 		metricsdatasource.NewResource,
+		team.NewResource,
+		team.NewMemberResource,
 	}
 }
