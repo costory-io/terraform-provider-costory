@@ -1186,27 +1186,15 @@ func (r AzureBillingDatasourceRequest) toAPIRequest() azureBillingDatasourceAPIR
 }
 
 func (r TeamCreateRequest) toAPIRequest() teamCreateAPIRequest {
-	return teamCreateAPIRequest{
-		Name:        r.Name,
-		Description: r.Description,
-		Visibility:  r.Visibility,
-	}
+	return teamCreateAPIRequest(r)
 }
 
 func (r TeamUpdateRequest) toAPIRequest() teamUpdateAPIRequest {
-	return teamUpdateAPIRequest{
-		Name:        r.Name,
-		Description: r.Description,
-		Visibility:  r.Visibility,
-	}
+	return teamUpdateAPIRequest(r)
 }
 
 func (r TeamMemberRequest) toAPIRequest() teamMemberAPIRequest {
-	return teamMemberAPIRequest{
-		UserID: r.UserID,
-		Email:  r.Email,
-		Role:   r.Role,
-	}
+	return teamMemberAPIRequest(r)
 }
 
 func (r gcpBillingDatasourceAPIResponse) toGCPBillingDatasource() *GCPBillingDatasource {

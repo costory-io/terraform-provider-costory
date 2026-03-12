@@ -122,7 +122,7 @@ func (r *teamMemberResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	teamID := plan.TeamID.ValueString()
-	memberKey := plan.UserID.ValueString()
+	memberKey := ""
 	request := costoryapi.TeamMemberRequest{}
 	if !plan.UserID.IsNull() && !plan.UserID.IsUnknown() {
 		userID := plan.UserID.ValueString()
