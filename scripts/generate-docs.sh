@@ -15,6 +15,7 @@ for f in "${docs_dir}"/*.md; do
   case "$name" in
     billing_datasource_*) subcategory="Billing Datasources" ;;
     metrics_datasource_*) subcategory="Metrics Datasources" ;;
+    team_*) subcategory="Teams" ;;
     *)                    continue ;;
   esac
   tmp="${f}.tmp"
