@@ -11,6 +11,8 @@ The provider currently supports:
   - GCP billing datasource lifecycle (`resource.costory_billing_datasource_gcp`)
   - AWS billing datasource lifecycle (`resource.costory_billing_datasource_aws`)
   - Azure billing datasource lifecycle (`resource.costory_billing_datasource_azure`)
+  - Team lifecycle (`resource.costory_team`)
+  - Team membership (`resource.costory_team_member`)
 
 ## Prerequisites
 
