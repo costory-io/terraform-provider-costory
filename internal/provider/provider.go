@@ -132,6 +132,7 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 		billingdatasource.NewAWSResource,
 		billingdatasource.NewCursorResource,
 		billingdatasource.NewAnthropicResource,
+		billingdatasource.NewElasticCloudResource,
 		billingdatasource.NewAzureResource,
 		metricsdatasource.NewResource,
 		team.NewResource,

@@ -169,6 +169,89 @@ func TestClientAnthropicBillingDatasourceCRUD(t *testing.T) {
 	}
 }
 
+func TestClientElasticCloudBillingDatasourceCRUD(t *testing.T) {
+	t.Parallel()
+
+	var validateCalls int
+	var createCalls int
+	var getCalls int
+	var deleteCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == routeBillingDatasourceValidate:
+			validateCalls++
+			assertElasticCloudCreateRequest(t, r, billingDatasourceTypeElasticCloud, "Elastic Cloud Billing", "ec-api-key-xyz", "org-123")
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && r.URL.Path == routeBillingDatasourceBase:
+			createCalls++
+			assertElasticCloudCreateRequest(t, r, billingDatasourceTypeElasticCloud, "Elastic Cloud Billing", "ec-api-key-xyz", "org-123")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":"ec-ds-1","type":"ElasticCloud","name":"Elastic Cloud Billing","organizationId":"org-123","bqTableUri":"example-project.elastic_cloud_raw.ec-ds-1","status":"ACTIVE"}`))
+		case r.Method == http.MethodGet && r.URL.Path == routeBillingDatasourceByID("ec-ds-1"):
+			getCalls++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"ec-ds-1","type":"ElasticCloud","name":"Elastic Cloud Billing","organizationId":"org-123","bqTableUri":"example-project.elastic_cloud_raw.ec-ds-1","status":"ACTIVE","startDate":"2025-03-01"}`))
+		case r.Method == http.MethodDelete && r.URL.Path == routeBillingDatasourceByID("ec-ds-1"):
+			deleteCalls++
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-token", server.Client())
+
+	createRequest := ElasticCloudBillingDatasourceRequest{
+		Name:           "Elastic Cloud Billing",
+		APIKey:         "ec-api-key-xyz",
+		OrganizationID: "org-123",
+		StartDate:      stringPointer("2025-03-01"),
+	}
+
+	if err := client.ValidateElasticCloudBillingDatasource(context.Background(), createRequest); err != nil {
+		t.Fatalf("unexpected validate error: %v", err)
+	}
+
+	created, err := client.CreateElasticCloudBillingDatasource(context.Background(), createRequest)
+	if err != nil {
+		t.Fatalf("unexpected create error: %v", err)
+	}
+
+	if created.ID != "ec-ds-1" {
+		t.Fatalf("unexpected created id: got %q, want %q", created.ID, "ec-ds-1")
+	}
+
+	current, err := client.GetElasticCloudBillingDatasource(context.Background(), "ec-ds-1")
+	if err != nil {
+		t.Fatalf("unexpected get error: %v", err)
+	}
+
+	if current.BQTableURI != "example-project.elastic_cloud_raw.ec-ds-1" {
+		t.Fatalf("unexpected bq table uri: got %q", current.BQTableURI)
+	}
+
+	if current.OrganizationID != "org-123" {
+		t.Fatalf("unexpected organization id: got %q", current.OrganizationID)
+	}
+
+	if current.StartDate == nil || *current.StartDate != "2025-03-01" {
+		t.Fatalf("unexpected start date: got %#v", current.StartDate)
+	}
+
+	if err := client.DeleteBillingDatasource(context.Background(), "ec-ds-1"); err != nil {
+		t.Fatalf("unexpected delete error: %v", err)
+	}
+
+	if validateCalls != 1 || createCalls != 1 || getCalls != 1 || deleteCalls != 1 {
+		t.Fatalf(
+			"unexpected call counters validate/create/get/delete: %d/%d/%d/%d",
+			validateCalls, createCalls, getCalls, deleteCalls,
+		)
+	}
+}
+
 func assertExternalCreateRequest(t *testing.T, r *http.Request, expectedType, expectedName, expectedKey string) {
 	t.Helper()
 
@@ -191,5 +274,34 @@ func assertExternalCreateRequest(t *testing.T, r *http.Request, expectedType, ex
 
 	if payload.AdminAPIKey != expectedKey {
 		t.Fatalf("unexpected admin api key: got %q, want %q", payload.AdminAPIKey, expectedKey)
+	}
+}
+
+func assertElasticCloudCreateRequest(t *testing.T, r *http.Request, expectedType, expectedName, expectedAPIKey, expectedOrgID string) {
+	t.Helper()
+
+	if got, want := r.Header.Get("Authorization"), "Bearer test-token"; got != want {
+		t.Fatalf("unexpected auth header: got %q, want %q", got, want)
+	}
+
+	var payload elasticCloudBillingDatasourceAPIRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		t.Fatalf("unable to decode request body: %v", err)
+	}
+
+	if payload.Type != expectedType {
+		t.Fatalf("unexpected datasource type: got %q, want %q", payload.Type, expectedType)
+	}
+
+	if payload.Name != expectedName {
+		t.Fatalf("unexpected datasource name: got %q, want %q", payload.Name, expectedName)
+	}
+
+	if payload.APIKey != expectedAPIKey {
+		t.Fatalf("unexpected api key: got %q, want %q", payload.APIKey, expectedAPIKey)
+	}
+
+	if payload.OrganizationID != expectedOrgID {
+		t.Fatalf("unexpected organization id: got %q, want %q", payload.OrganizationID, expectedOrgID)
 	}
 }

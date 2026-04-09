@@ -13,14 +13,15 @@ import (
 )
 
 const (
-	billingDatasourceTypeGCP       = "GCP"
-	billingDatasourceTypeAWS       = "AWS"
-	billingDatasourceTypeCursor    = "Cursor"
-	billingDatasourceTypeAnthropic = "Anthropic"
-	billingDatasourceTypeAzure     = "Azure"
-	metricsDatasourceTypeS3V2      = "AwsS3V2"
-	maxRetryAttempts               = 4
-	maxResponseBodyBytes           = 1024 * 1024
+	billingDatasourceTypeGCP          = "GCP"
+	billingDatasourceTypeAWS          = "AWS"
+	billingDatasourceTypeCursor       = "Cursor"
+	billingDatasourceTypeAnthropic    = "Anthropic"
+	billingDatasourceTypeElasticCloud = "ElasticCloud"
+	billingDatasourceTypeAzure        = "Azure"
+	metricsDatasourceTypeS3V2         = "AwsS3V2"
+	maxRetryAttempts                  = 4
+	maxResponseBodyBytes              = 1024 * 1024
 )
 
 // ErrNotFound is returned when the requested Costory resource does not exist.
@@ -135,6 +136,27 @@ type AnthropicBillingDatasource struct {
 	BQTableURI string
 	StartDate  *string
 	EndDate    *string
+}
+
+// ElasticCloudBillingDatasourceRequest is the Terraform input used to create/validate an Elastic Cloud billing datasource.
+type ElasticCloudBillingDatasourceRequest struct {
+	Name           string
+	APIKey         string
+	OrganizationID string
+	StartDate      *string
+	EndDate        *string
+}
+
+// ElasticCloudBillingDatasource is the normalized datasource payload returned by the Costory API.
+type ElasticCloudBillingDatasource struct {
+	ID             string
+	Type           string
+	Status         *string
+	Name           string
+	OrganizationID string
+	BQTableURI     string
+	StartDate      *string
+	EndDate        *string
 }
 
 // AzureBillingDatasourceRequest is the Terraform input used to create/validate an Azure billing datasource.
@@ -252,6 +274,26 @@ type externalBillingDatasourceAPIResponse struct {
 	BQTableURI string  `json:"bqTableUri"`
 	StartDate  *string `json:"startDate"`
 	EndDate    *string `json:"endDate"`
+}
+
+type elasticCloudBillingDatasourceAPIRequest struct {
+	Type           string  `json:"type"`
+	Name           string  `json:"name"`
+	APIKey         string  `json:"apiKey"`
+	OrganizationID string  `json:"organizationId"`
+	StartDate      *string `json:"startDate,omitempty"`
+	EndDate        *string `json:"endDate,omitempty"`
+}
+
+type elasticCloudBillingDatasourceAPIResponse struct {
+	ID             string  `json:"id"`
+	Type           string  `json:"type"`
+	Status         *string `json:"status"`
+	Name           string  `json:"name"`
+	OrganizationID string  `json:"organizationId"`
+	BQTableURI     string  `json:"bqTableUri"`
+	StartDate      *string `json:"startDate"`
+	EndDate        *string `json:"endDate"`
 }
 
 type azureBillingDatasourceAPIRequest struct {
@@ -683,6 +725,73 @@ func (c *Client) GetAnthropicBillingDatasource(ctx context.Context, datasourceID
 	}
 
 	normalized := out.toAnthropicBillingDatasource()
+	if normalized.ID == "" {
+		normalized.ID = datasourceID
+	}
+
+	return normalized, nil
+}
+
+// ValidateElasticCloudBillingDatasource validates an Elastic Cloud billing datasource before creation.
+func (c *Client) ValidateElasticCloudBillingDatasource(ctx context.Context, req ElasticCloudBillingDatasourceRequest) error {
+	body, statusCode, err := doEndpoint(ctx, c, endpointValidateElasticCloudBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return err
+	}
+
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		return nil
+	}
+
+	return unexpectedStatusError(statusCode, body)
+}
+
+// CreateElasticCloudBillingDatasource creates an Elastic Cloud billing datasource and returns its API representation.
+func (c *Client) CreateElasticCloudBillingDatasource(ctx context.Context, req ElasticCloudBillingDatasourceRequest) (*ElasticCloudBillingDatasource, error) {
+	body, statusCode, err := doEndpoint(ctx, c, endpointCreateElasticCloudBillingDatasource, req.toAPIRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode < http.StatusOK || statusCode >= http.StatusMultipleChoices {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out elasticCloudBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toElasticCloudBillingDatasource()
+	if normalized.ID == "" {
+		return nil, errors.New("create response did not include datasource id")
+	}
+
+	return normalized, nil
+}
+
+// GetElasticCloudBillingDatasource gets an Elastic Cloud billing datasource by ID.
+func (c *Client) GetElasticCloudBillingDatasource(ctx context.Context, datasourceID string) (*ElasticCloudBillingDatasource, error) {
+	routeParams := billingDatasourceByIDRouteParams{ID: datasourceID}
+	body, statusCode, err := doEndpointWithRouteParams(ctx, c, endpointGetElasticCloudBillingDatasourceByID, routeParams, noRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, unexpectedStatusError(statusCode, body)
+	}
+
+	var out elasticCloudBillingDatasourceAPIResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode response body: %w", err)
+	}
+
+	normalized := out.toElasticCloudBillingDatasource()
 	if normalized.ID == "" {
 		normalized.ID = datasourceID
 	}
@@ -1173,6 +1282,17 @@ func (r AnthropicBillingDatasourceRequest) toAPIRequest() externalBillingDatasou
 	}
 }
 
+func (r ElasticCloudBillingDatasourceRequest) toAPIRequest() elasticCloudBillingDatasourceAPIRequest {
+	return elasticCloudBillingDatasourceAPIRequest{
+		Type:           billingDatasourceTypeElasticCloud,
+		Name:           r.Name,
+		APIKey:         r.APIKey,
+		OrganizationID: r.OrganizationID,
+		StartDate:      r.StartDate,
+		EndDate:        r.EndDate,
+	}
+}
+
 func (r AzureBillingDatasourceRequest) toAPIRequest() azureBillingDatasourceAPIRequest {
 	return azureBillingDatasourceAPIRequest{
 		Type:               billingDatasourceTypeAzure,
@@ -1247,6 +1367,19 @@ func (r externalBillingDatasourceAPIResponse) toAnthropicBillingDatasource() *An
 		BQTableURI: r.BQTableURI,
 		StartDate:  r.StartDate,
 		EndDate:    r.EndDate,
+	}
+}
+
+func (r elasticCloudBillingDatasourceAPIResponse) toElasticCloudBillingDatasource() *ElasticCloudBillingDatasource {
+	return &ElasticCloudBillingDatasource{
+		ID:             r.ID,
+		Type:           r.Type,
+		Status:         r.Status,
+		Name:           r.Name,
+		OrganizationID: r.OrganizationID,
+		BQTableURI:     r.BQTableURI,
+		StartDate:      r.StartDate,
+		EndDate:        r.EndDate,
 	}
 }
 
