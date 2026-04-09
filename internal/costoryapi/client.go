@@ -144,7 +144,6 @@ type ElasticCloudBillingDatasourceRequest struct {
 	APIKey         string
 	OrganizationID string
 	StartDate      *string
-	EndDate        *string
 }
 
 // ElasticCloudBillingDatasource is the normalized datasource payload returned by the Costory API.
@@ -156,7 +155,6 @@ type ElasticCloudBillingDatasource struct {
 	OrganizationID string
 	BQTableURI     string
 	StartDate      *string
-	EndDate        *string
 }
 
 // AzureBillingDatasourceRequest is the Terraform input used to create/validate an Azure billing datasource.
@@ -282,7 +280,6 @@ type elasticCloudBillingDatasourceAPIRequest struct {
 	APIKey         string  `json:"apiKey"`
 	OrganizationID string  `json:"organizationId"`
 	StartDate      *string `json:"startDate,omitempty"`
-	EndDate        *string `json:"endDate,omitempty"`
 }
 
 type elasticCloudBillingDatasourceAPIResponse struct {
@@ -293,7 +290,6 @@ type elasticCloudBillingDatasourceAPIResponse struct {
 	OrganizationID string  `json:"organizationId"`
 	BQTableURI     string  `json:"bqTableUri"`
 	StartDate      *string `json:"startDate"`
-	EndDate        *string `json:"endDate"`
 }
 
 type azureBillingDatasourceAPIRequest struct {
@@ -1289,7 +1285,6 @@ func (r ElasticCloudBillingDatasourceRequest) toAPIRequest() elasticCloudBilling
 		APIKey:         r.APIKey,
 		OrganizationID: r.OrganizationID,
 		StartDate:      r.StartDate,
-		EndDate:        r.EndDate,
 	}
 }
 
@@ -1379,7 +1374,6 @@ func (r elasticCloudBillingDatasourceAPIResponse) toElasticCloudBillingDatasourc
 		OrganizationID: r.OrganizationID,
 		BQTableURI:     r.BQTableURI,
 		StartDate:      r.StartDate,
-		EndDate:        r.EndDate,
 	}
 }
 

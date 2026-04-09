@@ -35,7 +35,6 @@ type elasticCloudResourceModel struct {
 	OrganizationID types.String `tfsdk:"organization_id"`
 	BQTableURI     types.String `tfsdk:"bq_table_uri"`
 	StartDate      types.String `tfsdk:"start_date"`
-	EndDate        types.String `tfsdk:"end_date"`
 }
 
 // NewElasticCloudResource returns the Elastic Cloud billing datasource resource.
@@ -94,13 +93,6 @@ func (r *elasticCloudResource) Schema(_ context.Context, _ resource.SchemaReques
 			"start_date": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Optional filter start date (ISO-8601).",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"end_date": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "Optional filter end date (ISO-8601).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -251,11 +243,6 @@ func (m elasticCloudResourceModel) toRequestModel() costoryapi.ElasticCloudBilli
 		req.StartDate = &value
 	}
 
-	if !m.EndDate.IsNull() && !m.EndDate.IsUnknown() {
-		value := m.EndDate.ValueString()
-		req.EndDate = &value
-	}
-
 	return req
 }
 
@@ -291,9 +278,5 @@ func (m *elasticCloudResourceModel) mergeAPIResponse(apiResponse *costoryapi.Ela
 
 	if apiResponse.StartDate != nil {
 		m.StartDate = types.StringValue(*apiResponse.StartDate)
-	}
-
-	if apiResponse.EndDate != nil {
-		m.EndDate = types.StringValue(*apiResponse.EndDate)
 	}
 }

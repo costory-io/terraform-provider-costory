@@ -61,7 +61,6 @@ resource "costory_billing_datasource_elastic_cloud" "main" {
 
 ### Optional
 
-- `end_date` (String) Optional filter end date (ISO-8601).
 - `start_date` (String) Optional filter start date (ISO-8601).
 
 ### Read-Only

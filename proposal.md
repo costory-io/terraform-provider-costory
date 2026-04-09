@@ -2,18 +2,18 @@
 
 ## Goal
 
-Expose **Elastic Cloud** as a first-class billing datasource in the Costory Terraform provider, aligned with the app/API (`type: "ElasticCloud"`, credentials `apiKey` + `organizationId`, optional `startDate` / `endDate`, computed `bq_table_uri`, `status`, etc.).
+Expose **Elastic Cloud** as a first-class billing datasource in the Costory Terraform provider, aligned with the app/API (`type: "ElasticCloud"`, credentials `apiKey` + `organizationId`, optional `startDate`, computed `bq_table_uri`, `status`, etc.).
 
 ## Approach
 
 1. **API client (`internal/costoryapi`)**  
    - Add `billingDatasourceTypeElasticCloud = "ElasticCloud"`.  
-   - Introduce request/response structs with JSON tags matching the Costory Terraform API: `apiKey`, `organizationId`, `startDate`, `endDate`, `bqTableUri`, `status`.  
+   - Introduce request/response structs with JSON tags matching the Costory Terraform API: `apiKey`, `organizationId`, `startDate`, `bqTableUri`, `status`.  
    - Register validate/create/get endpoints (same URL patterns as other billing datasources).  
    - Implement `ValidateElasticCloudBillingDatasource`, `CreateElasticCloudBillingDatasource`, `GetElasticCloudBillingDatasource`.
 
 2. **Terraform resource**  
-   - New resource `costory_billing_datasource_elastic_cloud`, modeled on `costory_billing_datasource_anthropic`: immutable inputs with `RequiresReplace`, sensitive `api_key`, required `organization_id`, optional `start_date` / `end_date`, computed `id`, `type`, `status`, `bq_table_uri`.
+   - New resource `costory_billing_datasource_elastic_cloud`, modeled on `costory_billing_datasource_anthropic`: immutable inputs with `RequiresReplace`, sensitive `api_key`, required `organization_id`, optional `start_date`, computed `id`, `type`, `status`, `bq_table_uri`.
 
 3. **Provider registration**  
    - Register the resource in `internal/provider/provider.go`.
