@@ -113,7 +113,7 @@ func (p *costoryProvider) Configure(ctx context.Context, req provider.ConfigureR
 	}
 
 	client := costoryapi.NewClient(baseURL, token, &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 45 * time.Second,
 	})
 
 	resp.DataSourceData = client
