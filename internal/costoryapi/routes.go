@@ -85,6 +85,12 @@ var endpointValidateAnthropicBillingDatasource = endpointContract[externalBillin
 	RequestTransport: requestTransportJSONBody,
 }
 
+var endpointValidateElasticCloudBillingDatasource = endpointContract[elasticCloudBillingDatasourceAPIRequest, noResponse]{
+	Method:           http.MethodPost,
+	Path:             routeBillingDatasourceValidate,
+	RequestTransport: requestTransportJSONBody,
+}
+
 var endpointValidateAzureBillingDatasource = endpointContract[azureBillingDatasourceAPIRequest, noResponse]{
 	Method:           http.MethodPost,
 	Path:             routeBillingDatasourceValidate,
@@ -110,6 +116,12 @@ var endpointCreateCursorBillingDatasource = endpointContract[externalBillingData
 }
 
 var endpointCreateAnthropicBillingDatasource = endpointContract[externalBillingDatasourceAPIRequest, externalBillingDatasourceAPIResponse]{
+	Method:           http.MethodPost,
+	Path:             routeBillingDatasourceBase,
+	RequestTransport: requestTransportJSONBody,
+}
+
+var endpointCreateElasticCloudBillingDatasource = endpointContract[elasticCloudBillingDatasourceAPIRequest, elasticCloudBillingDatasourceAPIResponse]{
 	Method:           http.MethodPost,
 	Path:             routeBillingDatasourceBase,
 	RequestTransport: requestTransportJSONBody,
@@ -143,6 +155,13 @@ var endpointGetCursorBillingDatasourceByID = endpointWithRouteParamsContract[bil
 }
 
 var endpointGetAnthropicBillingDatasourceByID = endpointWithRouteParamsContract[billingDatasourceByIDRouteParams, noRequest, externalBillingDatasourceAPIResponse]{
+	Method:               http.MethodGet,
+	Path:                 routeBillingDatasourceByIDFromParams,
+	ParamsTransport:      requestTransportRouteParams,
+	RequestBodyTransport: requestTransportNone,
+}
+
+var endpointGetElasticCloudBillingDatasourceByID = endpointWithRouteParamsContract[billingDatasourceByIDRouteParams, noRequest, elasticCloudBillingDatasourceAPIResponse]{
 	Method:               http.MethodGet,
 	Path:                 routeBillingDatasourceByIDFromParams,
 	ParamsTransport:      requestTransportRouteParams,
