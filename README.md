@@ -22,7 +22,7 @@ Install:
 - [Go](https://go.dev/doc/install) `>= 1.24`
 - [Terraform CLI](https://developer.hashicorp.com/terraform/downloads)
 - [golangci-lint](https://golangci-lint.run/welcome/install/) (for local linting)
-- [`tfplugindocs`](https://github.com/hashicorp/terraform-plugin-docs) (optional locally; script installs via `go run`)
+- [`tfplugindocs`](https://github.com/hashicorp/terraform-plugin-docs) v0.24.0 (pinned in `go.mod`; run via `go tool tfplugindocs`)
 
 ---
 
