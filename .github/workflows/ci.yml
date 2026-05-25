@@ -48,6 +48,11 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.4"
+
       - name: Generate Terraform provider docs
         run: scripts/generate-docs.sh
 

@@ -64,7 +64,7 @@ go test ./...
 go build ./...
 ```
 
-Generate Terraform provider docs:
+Generate Terraform provider docs (requires `terraform` on `PATH`; the script does not rely on automatic downloads):
 
 ```bash
 scripts/generate-docs.sh
