@@ -1,4 +1,6 @@
 // Package main runs the Costory Terraform provider plugin server.
+//
+//go:generate bash scripts/generate-docs.sh
 package main
 
 import (

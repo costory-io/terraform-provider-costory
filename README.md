@@ -68,7 +68,11 @@ Generate Terraform provider docs (requires `terraform` on `PATH`; the script doe
 
 ```bash
 scripts/generate-docs.sh
+# or
+go generate ./...
 ```
+
+Edit examples under `examples/resources/` only — do not hand-edit the Terraform blocks in `docs/`; they are rendered by `go tool tfplugindocs` from those examples.
 
 The CI pipeline validates that docs are generated and committed. Any schema change
 under `internal/provider/` should be followed by regenerating docs and committing
