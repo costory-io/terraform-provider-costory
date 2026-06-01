@@ -1,31 +1,24 @@
-# COS-1643: Elastic Cloud billing datasource (Terraform)
+# COS-1844: Update Azure Terraform onboarding examples
 
 ## Goal
 
-Expose **Elastic Cloud** as a first-class billing datasource in the Costory Terraform provider, aligned with the app/API (`type: "ElasticCloud"`, credentials `apiKey` + `organizationId`, optional `startDate`, computed `bq_table_uri`, `status`, etc.).
+Align the Azure billing datasource Terraform example with feedback from a customer onboarding run: provider version, export blob paths, and required `partitionData` on Cost Management exports.
 
-## Approach
+## Changes
 
-1. **API client (`internal/costoryapi`)**  
-   - Add `billingDatasourceTypeElasticCloud = "ElasticCloud"`.  
-   - Introduce request/response structs with JSON tags matching the Costory Terraform API: `apiKey`, `organizationId`, `startDate`, `bqTableUri`, `status`.  
-   - Register validate/create/get endpoints (same URL patterns as other billing datasources).  
-   - Implement `ValidateElasticCloudBillingDatasource`, `CreateElasticCloudBillingDatasource`, `GetElasticCloudBillingDatasource`.
+1. **Provider version** — Replace deprecated `>= 0.1.0` with `~> 0.2` so examples do not resolve to unsupported 0.1.x releases.
 
-2. **Terraform resource**  
-   - New resource `costory_billing_datasource_elastic_cloud`, modeled on `costory_billing_datasource_anthropic`: immutable inputs with `RequiresReplace`, sensitive `api_key`, required `organization_id`, optional `start_date`, computed `id`, `type`, `status`, `bq_table_uri`.
+2. **`partitionData`** — Set `partitionData = true` on both `azapi_resource` Cost Management exports (`actuals` and `amortized`). Required by current Azure/azapi APIs.
 
-3. **Provider registration**  
-   - Register the resource in `internal/provider/provider.go`.
+3. **Export paths** — With partitioned exports, blobs land under `{rootFolderPath}/{exportName}/`. Introduce locals for export names and set:
+   - `actuals_path = "actuals/${local.actuals_export_name}"`
+   - `amortized_path = "amortized/${local.amortized_export_name}"`
 
-4. **Tests**  
-   - Add an httptest CRUD test for the Elastic Cloud client (mirror Anthropic external test).
+4. **Infrastructure-only example** — Apply `partitionData` to `examples/resources/costory_azure_datasource/resource.tf` for consistency.
 
-5. **Docs and examples**  
-   - Add `examples/resources/costory_billing_datasource_elastic_cloud/resource.tf`.  
-   - Run `scripts/generate-docs.sh` to produce `docs/resources/billing_datasource_elastic_cloud.md`.  
-   - Update `README.md` feature list and optional usage snippet.
+5. **Docs** — Regenerate `docs/resources/billing_datasource_azure.md` from the example via `scripts/generate-docs.sh`.
 
 ## Out of scope
 
-- UX docs (`ux_impact.md` / `ux_proposal.md`) — not requested for this backend/IaC change.
+- Other billing datasource examples (GCP, AWS, etc.) — not mentioned in the issue.
+- Provider code or schema changes.

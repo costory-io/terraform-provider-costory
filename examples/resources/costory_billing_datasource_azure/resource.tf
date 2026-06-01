@@ -20,7 +20,7 @@ terraform {
     }
     costory = {
       source  = "costory-io/costory"
-      version = ">= 0.1.0"
+      version = "~> 0.2"
     }
   }
 }
@@ -108,9 +108,14 @@ resource "azurerm_storage_container" "billing" {
 
 resource "time_static" "export_start" {}
 
+locals {
+  actuals_export_name   = "costory-actuals-${random_string.storage_suffix.result}"
+  amortized_export_name = "costory-amortized-${random_string.storage_suffix.result}"
+}
+
 resource "azapi_resource" "actuals" {
   type      = "Microsoft.CostManagement/exports@2025-03-01"
-  name      = "costory-actuals-${random_string.storage_suffix.result}"
+  name      = local.actuals_export_name
   parent_id = "/subscriptions/${var.subscription_id}"
 
   body = {
@@ -130,7 +135,8 @@ resource "azapi_resource" "actuals" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format = "Parquet"
+      format        = "Parquet"
+      partitionData = true
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -144,7 +150,7 @@ resource "azapi_resource" "actuals" {
 
 resource "azapi_resource" "amortized" {
   type      = "Microsoft.CostManagement/exports@2025-03-01"
-  name      = "costory-amortized-${random_string.storage_suffix.result}"
+  name      = local.amortized_export_name
   parent_id = "/subscriptions/${var.subscription_id}"
 
   body = {
@@ -164,7 +170,8 @@ resource "azapi_resource" "amortized" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format = "Parquet"
+      format        = "Parquet"
+      partitionData = true
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -285,8 +292,8 @@ resource "costory_billing_datasource_azure" "main" {
   sas_url              = local.blob_endpoint_with_sas
   storage_account_name = azurerm_storage_account.cost_exports.name
   container_name       = azurerm_storage_container.billing.name
-  actuals_path         = "actuals"
-  amortized_path       = "amortized"
+  actuals_path         = "actuals/${local.actuals_export_name}"
+  amortized_path       = "amortized/${local.amortized_export_name}"
 }
 
 output "storage_account_name" {

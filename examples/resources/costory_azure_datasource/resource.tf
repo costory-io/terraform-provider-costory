@@ -100,9 +100,14 @@ resource "azurerm_storage_container" "billing" {
 
 resource "time_static" "export_start" {}
 
+locals {
+  actuals_export_name   = "costory-actuals-${random_string.storage_suffix.result}"
+  amortized_export_name = "costory-amortized-${random_string.storage_suffix.result}"
+}
+
 resource "azapi_resource" "actuals" {
   type      = "Microsoft.CostManagement/exports@2025-03-01"
-  name      = "costory-actuals-${random_string.storage_suffix.result}"
+  name      = local.actuals_export_name
   parent_id = "/subscriptions/${var.subscription_id}"
 
   body = {
@@ -122,7 +127,8 @@ resource "azapi_resource" "actuals" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format = "Parquet"
+      format        = "Parquet"
+      partitionData = true
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -136,7 +142,7 @@ resource "azapi_resource" "actuals" {
 
 resource "azapi_resource" "amortized" {
   type      = "Microsoft.CostManagement/exports@2025-03-01"
-  name      = "costory-amortized-${random_string.storage_suffix.result}"
+  name      = local.amortized_export_name
   parent_id = "/subscriptions/${var.subscription_id}"
 
   body = {
@@ -156,7 +162,8 @@ resource "azapi_resource" "amortized" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format = "Parquet"
+      format        = "Parquet"
+      partitionData = true
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
