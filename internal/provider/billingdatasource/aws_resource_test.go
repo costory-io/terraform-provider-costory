@@ -17,9 +17,9 @@ func TestAddAWSPendingImportWarning(t *testing.T) {
 		wantDetail string
 	}{
 		{
-			name:      "pending status emits warning",
-			status:    types.StringValue(awsBillingDatasourceStatusPending),
-			wantWarns: 1,
+			name:       "pending status emits warning",
+			status:     types.StringValue(awsBillingDatasourceStatusPending),
+			wantWarns:  1,
 			wantDetail: awsPendingImportWarningDetail,
 		},
 		{
