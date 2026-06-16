@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -14,6 +15,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/costory-io/costory-terraform/internal/costoryapi"
+)
+
+const (
+	awsBillingDatasourceStatusPending = "PENDING"
+
+	awsPendingImportWarningSummary = "AWS import pending"
+	awsPendingImportWarningDetail  = "AWS takes 12hours + to export the first batch of data. Costory will check tomorrow morning and will let you know by email when your domain is ready."
 )
 
 var (
@@ -184,6 +192,8 @@ func (r *awsResource) Create(ctx context.Context, req resource.CreateRequest, re
 		plan.mergeAPIResponse(current)
 	}
 
+	addAWSPendingImportWarning(&resp.Diagnostics, plan.Status)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -220,6 +230,8 @@ func (r *awsResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 	if state.ID.IsNull() || state.ID.IsUnknown() {
 		state.ID = types.StringValue(current.ID)
 	}
+
+	addAWSPendingImportWarning(&resp.Diagnostics, state.Status)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -289,6 +301,18 @@ func (m awsResourceModel) toRequestModel() costoryapi.AWSBillingDatasourceReques
 	}
 
 	return req
+}
+
+func addAWSPendingImportWarning(diags *diag.Diagnostics, status types.String) {
+	if status.IsNull() || status.IsUnknown() {
+		return
+	}
+
+	if status.ValueString() != awsBillingDatasourceStatusPending {
+		return
+	}
+
+	diags.AddWarning(awsPendingImportWarningSummary, awsPendingImportWarningDetail)
 }
 
 func (m *awsResourceModel) mergeAPIResponse(apiResponse *costoryapi.AWSBillingDatasource) {
