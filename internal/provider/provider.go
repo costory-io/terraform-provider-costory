@@ -15,7 +15,6 @@ import (
 
 	"github.com/costory-io/costory-terraform/internal/costoryapi"
 	"github.com/costory-io/costory-terraform/internal/provider/billingdatasource"
-	"github.com/costory-io/costory-terraform/internal/provider/metricsdatasource"
 	"github.com/costory-io/costory-terraform/internal/provider/team"
 )
 
@@ -134,7 +133,6 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 		billingdatasource.NewAnthropicResource,
 		billingdatasource.NewElasticCloudResource,
 		billingdatasource.NewAzureResource,
-		metricsdatasource.NewResource,
 		team.NewResource,
 		team.NewMemberResource,
 	}
