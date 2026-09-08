@@ -44,9 +44,9 @@ provider "costory" {
 }
 
 resource "costory_billing_datasource_elastic_cloud" "main" {
-  name             = "Elastic Cloud Billing"
-  api_key          = var.elastic_cloud_api_key
-  organization_id  = var.elastic_cloud_organization_id
+  name            = "Elastic Cloud Billing"
+  api_key         = var.elastic_cloud_api_key
+  organization_id = var.elastic_cloud_organization_id
 }
 ```
 
