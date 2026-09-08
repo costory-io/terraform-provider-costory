@@ -8,10 +8,7 @@ The provider currently supports:
 - Configure provider with `token`
 - Setup Costory:
   - service-account discovery (`data.costory_service_account`)
-  - GCP billing datasource lifecycle (`resource.costory_billing_datasource_gcp`)
-  - AWS billing datasource lifecycle (`resource.costory_billing_datasource_aws`)
-  - Elastic Cloud billing datasource lifecycle (`resource.costory_billing_datasource_elastic_cloud`)
-  - Azure billing datasource lifecycle (`resource.costory_billing_datasource_azure`)
+  - Billing datasources: GCP, AWS, Azure, Cursor, Anthropic, Anthropic Claude AI, Elastic Cloud, ClickHouse Cloud, Cloudflare, Scaleway, OpenAI, custom BigQuery, Confluent, Datadog, Aiven, GCP CUD export, Snowflake
   - Team lifecycle (`resource.costory_team`)
   - Team membership (`resource.costory_team_member`)
 
