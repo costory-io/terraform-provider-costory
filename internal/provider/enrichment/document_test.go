@@ -6,7 +6,7 @@ func TestDocumentsEqualIgnoresKeyOrderAndNull(t *testing.T) {
 	t.Parallel()
 
 	file := map[string]any{
-		"name":       "02_namespace_to_org",
+		"name":       "namespace",
 		"keyField":   "cos_namespace",
 		"priority":   float64(2),
 		"conditions": nil,
@@ -22,7 +22,7 @@ func TestDocumentsEqualIgnoresKeyOrderAndNull(t *testing.T) {
 		},
 		"priority": float64(2),
 		"keyField": "cos_namespace",
-		"name":     "02_namespace_to_org",
+		"name":     "namespace",
 	}
 
 	if !documentsEqual(file, stored) {
@@ -104,11 +104,11 @@ func TestRemovedNames(t *testing.T) {
 func TestDocsExampleParses(t *testing.T) {
 	t.Parallel()
 
-	document, err := readDocument("../../../examples/resources/costory_enrichment/enrichments/02_namespace_to_org.yaml")
+	document, err := readDocument("../../../examples/resources/costory_enrichment/enrichments/namespace.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if document["name"] != "02_namespace_to_org" || len(document["targetColumns"].([]any)) != 1 {
+	if document["name"] != "namespace" || len(document["targetColumns"].([]any)) != 1 {
 		t.Fatalf("unexpected document: %#v", document)
 	}
 }

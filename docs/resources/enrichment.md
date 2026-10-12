@@ -43,11 +43,11 @@ resource "costory_enrichment" "all" {
 
 ## Example mapping file
 
-`enrichments/02_namespace_to_org.yaml`: rows whose `cos_namespace` is `payments` get `owner_org = Payments`.
+`enrichments/namespace.yaml`: rows whose `cos_namespace` is `payments` get `owner_org = Payments`.
 
 ```yaml
 # Maps a Kubernetes namespace to the team that owns it.
-name: 02_namespace_to_org
+name: namespace
 description: Owner of each namespace
 keyField: cos_namespace # billing column read as the key
 priority: 2 # lower runs first when several enrichments fill the same columns

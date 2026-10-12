@@ -12,7 +12,7 @@ func TestPutEnrichmentReturnsOneErrorPerMessage(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut || r.URL.Path != "/enrichments/02_namespace_to_org" {
+		if r.Method != http.MethodPut || r.URL.Path != "/enrichments/namespace" {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusBadRequest)
@@ -21,7 +21,7 @@ func TestPutEnrichmentReturnsOneErrorPerMessage(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "test-token", server.Client())
-	err := client.PutEnrichment(context.Background(), "02_namespace_to_org", map[string]any{"name": "02_namespace_to_org"})
+	err := client.PutEnrichment(context.Background(), "namespace", map[string]any{"name": "namespace"})
 	var statusErr *StatusError
 	if !errors.As(err, &statusErr) {
 		t.Fatalf("expected StatusError, got %v", err)
