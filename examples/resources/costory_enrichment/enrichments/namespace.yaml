@@ -1,0 +1,14 @@
+# Maps a Kubernetes namespace to the team that owns it.
+name: namespace
+description: Owner of each namespace
+keyField: cos_namespace # billing column read as the key
+priority: 2 # lower runs first when several enrichments fill the same columns
+conditions: input.cos_cluster_name != null # optional, CEL
+targetColumns: # filled columns, in order
+  owner_org: { mode: merge } # merge: only fills empty values; replace: overwrites
+entries:
+  - key: payments
+    then: { owner_org: Payments }
+  - key: fluent-bit
+    when: { start: "2026-01-01" } # optional, YYYY-MM-DD
+    then: { owner_org: SRE }

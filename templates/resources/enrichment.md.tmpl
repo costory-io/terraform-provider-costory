@@ -1,0 +1,22 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+## Example mapping file
+
+`enrichments/namespace.yaml`: rows whose `cos_namespace` is `payments` get `owner_org = Payments`.
+
+{{ codefile "yaml" "examples/resources/costory_enrichment/enrichments/namespace.yaml" }}
+
+{{ .SchemaMarkdown | trimspace }}

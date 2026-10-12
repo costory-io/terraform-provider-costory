@@ -1018,7 +1018,12 @@ func (c *Client) doJSON(ctx context.Context, method, path string, requestBody an
 			return nil, 0, fmt.Errorf("execute request: %w", err)
 		}
 
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes))
+		limit := int64(maxResponseBodyBytes)
+		if strings.HasPrefix(path, "/enrichments") {
+			// A mapping document is capped at 10 MB on write. Leave room for the JSON envelope.
+			limit = 12 * 1024 * 1024
+		}
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, limit))
 		closeErr := resp.Body.Close()
 		if readErr != nil {
 			return nil, 0, fmt.Errorf("read response body: %w", readErr)

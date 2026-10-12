@@ -15,6 +15,7 @@ import (
 
 	"github.com/costory-io/costory-terraform/internal/costoryapi"
 	"github.com/costory-io/costory-terraform/internal/provider/billingdatasource"
+	"github.com/costory-io/costory-terraform/internal/provider/enrichment"
 	"github.com/costory-io/costory-terraform/internal/provider/team"
 )
 
@@ -145,6 +146,8 @@ func (p *costoryProvider) Resources(_ context.Context) []func() resource.Resourc
 		billingdatasource.NewGCPCUDExportResource,
 		billingdatasource.NewSnowflakeResource,
 		team.NewResource,
+		enrichment.NewResource,
+		enrichment.NewPublishResource,
 		team.NewMemberResource,
 	}
 }
