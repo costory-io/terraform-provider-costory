@@ -1,24 +1,25 @@
-# COS-1844: Update Azure Terraform onboarding examples
+# COS-1968: Add Terraform pending message for AWS imports
 
-## Goal
+## Problem
 
-Align the Azure billing datasource Terraform example with feedback from a customer onboarding run: provider version, export blob paths, and required `partitionData` on Cost Management exports.
+During onboarding, users repeatedly relaunched AWS billing datasource imports while the first export was still in progress. AWS can take up to 24 hours to deliver the first billing export batch, but Terraform gave no signal to wait—unlike the web UI, which shows an "import in progress" message.
 
-## Changes
+## Solution
 
-1. **Provider version** — Replace deprecated `>= 0.1.0` with `~> 0.2` so examples do not resolve to unsupported 0.1.x releases.
+Emit a Terraform diagnostic **warning** (not an error) when `costory_billing_datasource_aws` has `status = "PENDING"` after create or read. Warnings surface in `terraform apply` / `terraform plan` output without failing the run.
 
-2. **`partitionData`** — Set `partitionData = true` on both `azapi_resource` Cost Management exports (`actuals` and `amortized`). Required by current Azure/azapi APIs.
+Use `resp.Diagnostics.AddWarning` with this detail text (per issue):
 
-3. **Export paths** — With partitioned exports, blobs land under `{rootFolderPath}/{exportName}/`. Introduce locals for export names and set:
-   - `actuals_path = "actuals/${local.actuals_export_name}"`
-   - `amortized_path = "amortized/${local.amortized_export_name}"`
+> AWS takes 12hours + to export the first batch of data. Costory will check tomorrow morning and will let you know by email when your domain is ready.
 
-4. **Infrastructure-only example** — Apply `partitionData` to `examples/resources/costory_azure_datasource/resource.tf` for consistency.
+## Implementation
 
-5. **Docs** — Regenerate `docs/resources/billing_datasource_azure.md` from the example via `scripts/generate-docs.sh`.
+1. Add a small helper in `internal/provider/billingdatasource/aws_resource.go` that checks `status == "PENDING"` and appends the warning.
+2. Call it at the end of `Create` and `Read`, after the API response is merged into state.
+3. Add a unit test for the helper to lock in the warning behavior.
 
 ## Out of scope
 
-- Other billing datasource examples (GCP, AWS, etc.) — not mentioned in the issue.
-- Provider code or schema changes.
+- Warnings for other cloud providers (GCP, Azure, etc.)—issue is AWS-specific.
+- Provider schema or API client changes.
+- Docs regeneration (warning is runtime-only, not a schema attribute).
