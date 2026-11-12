@@ -2,7 +2,6 @@ package costoryapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -109,36 +108,14 @@ func TestClientAzureBillingDatasourceCRUD(t *testing.T) {
 func assertAzureCreateRequest(t *testing.T, r *http.Request) {
 	t.Helper()
 
-	if got, want := r.Header.Get("Authorization"), "Bearer test-token"; got != want {
-		t.Fatalf("unexpected auth header: got %q, want %q", got, want)
-	}
-
-	var payload azureBillingDatasourceAPIRequest
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		t.Fatalf("unable to decode request body: %v", err)
-	}
-
-	if payload.Type != billingDatasourceTypeAzure {
-		t.Fatalf("unexpected datasource type: got %q, want %q", payload.Type, billingDatasourceTypeAzure)
-	}
-
-	if payload.Name != "Azure Billing" {
-		t.Fatalf("unexpected datasource name: got %q", payload.Name)
-	}
-
-	if payload.ClientID != "11111111-1111-1111-1111-111111111111" {
-		t.Fatalf("unexpected client id: got %q", payload.ClientID)
-	}
-
-	if payload.TenantID != "22222222-2222-2222-2222-222222222222" {
-		t.Fatalf("unexpected tenant id: got %q", payload.TenantID)
-	}
-
-	if payload.StorageAccountName != "storageaccount" || payload.ContainerName != "billing-exports" {
-		t.Fatalf("unexpected storage/container: %q/%q", payload.StorageAccountName, payload.ContainerName)
-	}
-
-	if payload.ActualsPath != "actuals" || payload.AmortizedPath != "amortized" {
-		t.Fatalf("unexpected paths: actuals=%q amortized=%q", payload.ActualsPath, payload.AmortizedPath)
-	}
+	assertJSONObject(t, r, map[string]any{
+		"type":               billingDatasourceTypeAzure,
+		"name":               "Azure Billing",
+		"clientId":           "11111111-1111-1111-1111-111111111111",
+		"tenantId":           "22222222-2222-2222-2222-222222222222",
+		"storageAccountName": "storageaccount",
+		"containerName":      "billing-exports",
+		"actualsPath":        "actuals",
+		"amortizedPath":      "amortized",
+	})
 }
