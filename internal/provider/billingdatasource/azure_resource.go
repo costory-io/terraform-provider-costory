@@ -29,7 +29,8 @@ type azureResourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	Status             types.String `tfsdk:"status"`
 	Name               types.String `tfsdk:"name"`
-	SASURL             types.String `tfsdk:"sas_url"`
+	ClientID           types.String `tfsdk:"client_id"`
+	TenantID           types.String `tfsdk:"tenant_id"`
 	StorageAccountName types.String `tfsdk:"storage_account_name"`
 	ContainerName      types.String `tfsdk:"container_name"`
 	ActualsPath        types.String `tfsdk:"actuals_path"`
@@ -64,10 +65,16 @@ func (r *azureResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"sas_url": schema.StringAttribute{
+			"client_id": schema.StringAttribute{
 				Required:            true,
-				Sensitive:           true,
-				MarkdownDescription: "Full Azure blob SAS URL including the query string.",
+				MarkdownDescription: "Azure AD application (client) ID used for federated identity.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"tenant_id": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Azure AD tenant ID used for federated identity.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -237,7 +244,8 @@ func (r *azureResource) ImportState(ctx context.Context, req resource.ImportStat
 func (m azureResourceModel) toRequestModel() costoryapi.AzureBillingDatasourceRequest {
 	return costoryapi.AzureBillingDatasourceRequest{
 		Name:               m.Name.ValueString(),
-		SASURL:             m.SASURL.ValueString(),
+		ClientID:           m.ClientID.ValueString(),
+		TenantID:           m.TenantID.ValueString(),
 		StorageAccountName: m.StorageAccountName.ValueString(),
 		ContainerName:      m.ContainerName.ValueString(),
 		ActualsPath:        m.ActualsPath.ValueString(),
@@ -261,6 +269,14 @@ func (m *azureResourceModel) mergeAPIResponse(apiResponse *costoryapi.AzureBilli
 
 	if apiResponse.Name != "" {
 		m.Name = types.StringValue(apiResponse.Name)
+	}
+
+	if apiResponse.ClientID != "" {
+		m.ClientID = types.StringValue(apiResponse.ClientID)
+	}
+
+	if apiResponse.TenantID != "" {
+		m.TenantID = types.StringValue(apiResponse.TenantID)
 	}
 
 	if apiResponse.StorageAccountName != "" {

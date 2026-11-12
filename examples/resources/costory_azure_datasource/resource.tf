@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
     azapi = {
       source  = "Azure/azapi"
       version = "~> 2.0"
@@ -26,6 +30,8 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
+provider "azuread" {}
+
 # ──────────────────────────────────────────────
 # Variables
 # ──────────────────────────────────────────────
@@ -35,7 +41,10 @@ variable "subscription_id" {
   description = "Azure subscription ID."
 }
 
-
+variable "costory_google_unique_id" {
+  type        = string
+  description = "Costory Google service account unique ID used as the federated credential subject. Copy it from Connect Azure in Costory, or from data.costory_service_account.current.sub_ids[0]."
+}
 
 variable "location" {
   type        = string
@@ -55,12 +64,6 @@ variable "storage_account_name_prefix" {
   default     = "costexports"
 }
 
-variable "sas_token_validity_days" {
-  type        = number
-  description = "Number of days the SAS token remains valid."
-  default     = 900
-}
-
 variable "backfill_month_count" {
   type        = number
   description = "Number of past months to backfill (0 to skip)."
@@ -72,6 +75,8 @@ variable "run_backfill" {
   description = "Set to true to trigger backfill runs. Use: terraform apply -var='run_backfill=true'"
   default     = false
 }
+
+data "azuread_client_config" "current" {}
 
 resource "azurerm_resource_group" "cost_exports" {
   name     = var.resource_group_name
@@ -127,8 +132,9 @@ resource "azapi_resource" "actuals" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format        = "Parquet"
-      partitionData = true
+      format                = "Parquet"
+      partitionData         = true
+      dataOverwriteBehavior = "OverwritePreviousReport"
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -162,8 +168,9 @@ resource "azapi_resource" "amortized" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format        = "Parquet"
-      partitionData = true
+      format                = "Parquet"
+      partitionData         = true
+      dataOverwriteBehavior = "OverwritePreviousReport"
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -239,44 +246,31 @@ resource "azapi_resource_action" "backfill_amortized" {
 }
 
 # ──────────────────────────────────────────────
-# SAS Token
+# Azure AD federated identity
 # ──────────────────────────────────────────────
 
-resource "time_static" "sas_start" {}
+resource "azuread_application" "costory" {
+  display_name = "costory-billing-${random_string.storage_suffix.result}"
+}
 
-data "azurerm_storage_account_sas" "billing" {
-  connection_string = azurerm_storage_account.cost_exports.primary_connection_string
-  https_only        = true
-  signed_version    = "2022-11-02"
+resource "azuread_service_principal" "costory" {
+  client_id = azuread_application.costory.client_id
+}
 
-  start  = time_static.sas_start.rfc3339
-  expiry = timeadd(time_static.sas_start.rfc3339, "${var.sas_token_validity_days * 24}h")
+resource "azuread_application_federated_identity_credential" "costory" {
+  application_id = azuread_application.costory.id
+  display_name   = "costory-gcp"
+  description    = "Allow Costory to read Azure billing exports via Google federated identity."
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://accounts.google.com"
+  subject        = var.costory_google_unique_id
+}
 
-  resource_types {
-    service   = false
-    container = true
-    object    = true
-  }
-
-  services {
-    blob  = true
-    queue = false
-    table = false
-    file  = false
-  }
-
-  permissions {
-    read    = true
-    write   = false
-    delete  = false
-    list    = true
-    add     = false
-    create  = false
-    update  = false
-    process = false
-    tag     = false
-    filter  = false
-  }
+resource "azurerm_role_assignment" "costory_blob_reader" {
+  scope                            = "${azurerm_storage_account.cost_exports.id}/blobServices/default/containers/${azurerm_storage_container.billing.name}"
+  role_definition_name             = "Storage Blob Data Reader"
+  principal_id                     = azuread_service_principal.costory.object_id
+  skip_service_principal_aad_check = true
 }
 
 output "resource_group_name" {
@@ -291,17 +285,12 @@ output "storage_container_name" {
   value = azurerm_storage_container.billing.name
 }
 
-output "sas_token" {
-  value     = data.azurerm_storage_account_sas.billing.sas
-  sensitive = true
+output "client_id" {
+  description = "Azure AD application (client) ID for Costory federated identity."
+  value       = azuread_application.costory.client_id
 }
 
-output "blob_endpoint_with_sas" {
-  description = "Full blob endpoint URL with SAS token for accessing billing exports."
-  value       = "${azurerm_storage_account.cost_exports.primary_blob_endpoint}${azurerm_storage_container.billing.name}${data.azurerm_storage_account_sas.billing.sas}"
-  sensitive   = true
-}
-
-output "sas_token_expiry" {
-  value = timeadd(time_static.sas_start.rfc3339, "${var.sas_token_validity_days * 24}h")
+output "tenant_id" {
+  description = "Azure AD tenant ID for Costory federated identity."
+  value       = data.azuread_client_config.current.tenant_id
 }

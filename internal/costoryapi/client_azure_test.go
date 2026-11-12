@@ -26,11 +26,11 @@ func TestClientAzureBillingDatasourceCRUD(t *testing.T) {
 			createCalls++
 			assertAzureCreateRequest(t, r)
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"id":"azure-ds-1","type":"Azure","name":"Azure Billing","storageAccountName":"storageaccount","containerName":"billing-exports","actualsPath":"actuals","amortizedPath":"amortized","status":"ACTIVE"}`))
+			_, _ = w.Write([]byte(`{"id":"azure-ds-1","type":"Azure","name":"Azure Billing","clientId":"11111111-1111-1111-1111-111111111111","tenantId":"22222222-2222-2222-2222-222222222222","storageAccountName":"storageaccount","containerName":"billing-exports","actualsPath":"actuals","amortizedPath":"amortized","status":"ACTIVE"}`))
 		case r.Method == http.MethodGet && r.URL.Path == routeBillingDatasourceByID("azure-ds-1"):
 			getCalls++
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"type":"Azure","name":"Azure Billing","storageAccountName":"storageaccount","containerName":"billing-exports","actualsPath":"actuals","amortizedPath":"amortized","status":"ACTIVE"}`))
+			_, _ = w.Write([]byte(`{"type":"Azure","name":"Azure Billing","clientId":"11111111-1111-1111-1111-111111111111","tenantId":"22222222-2222-2222-2222-222222222222","storageAccountName":"storageaccount","containerName":"billing-exports","actualsPath":"actuals","amortizedPath":"amortized","status":"ACTIVE"}`))
 		case r.Method == http.MethodDelete && r.URL.Path == routeBillingDatasourceByID("azure-ds-1"):
 			deleteCalls++
 			w.WriteHeader(http.StatusNoContent)
@@ -44,7 +44,8 @@ func TestClientAzureBillingDatasourceCRUD(t *testing.T) {
 
 	createRequest := AzureBillingDatasourceRequest{
 		Name:               "Azure Billing",
-		SASURL:             "https://account.blob.core.windows.net/billing-exports?sv=2024-01-01&sig=example",
+		ClientID:           "11111111-1111-1111-1111-111111111111",
+		TenantID:           "22222222-2222-2222-2222-222222222222",
 		StorageAccountName: "storageaccount",
 		ContainerName:      "billing-exports",
 		ActualsPath:        "actuals",
@@ -79,6 +80,14 @@ func TestClientAzureBillingDatasourceCRUD(t *testing.T) {
 
 	if current.ContainerName != "billing-exports" {
 		t.Fatalf("unexpected container name: got %q", current.ContainerName)
+	}
+
+	if current.ClientID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected client id: got %q", current.ClientID)
+	}
+
+	if current.TenantID != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("unexpected tenant id: got %q", current.TenantID)
 	}
 
 	if current.ActualsPath != "actuals" || current.AmortizedPath != "amortized" {
@@ -117,8 +126,12 @@ func assertAzureCreateRequest(t *testing.T, r *http.Request) {
 		t.Fatalf("unexpected datasource name: got %q", payload.Name)
 	}
 
-	if payload.SASURL == "" {
-		t.Fatal("expected sas url to be set")
+	if payload.ClientID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected client id: got %q", payload.ClientID)
+	}
+
+	if payload.TenantID != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("unexpected tenant id: got %q", payload.TenantID)
 	}
 
 	if payload.StorageAccountName != "storageaccount" || payload.ContainerName != "billing-exports" {
