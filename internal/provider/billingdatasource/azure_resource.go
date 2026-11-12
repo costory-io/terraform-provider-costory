@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &azureResource{}
-	_ resource.ResourceWithConfigure   = &azureResource{}
-	_ resource.ResourceWithImportState = &azureResource{}
+	_ resource.Resource                 = &azureResource{}
+	_ resource.ResourceWithConfigure    = &azureResource{}
+	_ resource.ResourceWithImportState  = &azureResource{}
+	_ resource.ResourceWithUpgradeState = &azureResource{}
 )
 
 type azureResource struct {
@@ -37,6 +38,18 @@ type azureResourceModel struct {
 	AmortizedPath      types.String `tfsdk:"amortized_path"`
 }
 
+// azureResourceModelV0 is the schema used before federated identity (sas_url).
+type azureResourceModelV0 struct {
+	ID                 types.String `tfsdk:"id"`
+	Status             types.String `tfsdk:"status"`
+	Name               types.String `tfsdk:"name"`
+	SASURL             types.String `tfsdk:"sas_url"`
+	StorageAccountName types.String `tfsdk:"storage_account_name"`
+	ContainerName      types.String `tfsdk:"container_name"`
+	ActualsPath        types.String `tfsdk:"actuals_path"`
+	AmortizedPath      types.String `tfsdk:"amortized_path"`
+}
+
 // NewAzureResource returns the Azure billing datasource resource.
 func NewAzureResource() resource.Resource {
 	return &azureResource{}
@@ -48,7 +61,8 @@ func (r *azureResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *azureResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Creates a Costory Azure billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#azure).",
+		Version:             1,
+		MarkdownDescription: "Creates a Costory Azure billing datasource with Azure AD federated identity (`client_id` and `tenant_id`). This is a breaking change from `sas_url`: Costory no longer accepts a SAS URL on create. Existing SAS connections keep working in Costory until you switch them in the UI (**Integrations ⋯ Switch to federated identity**); Terraform does not perform that switch. After switching, replace `sas_url` with `client_id` and `tenant_id` and apply — the provider upgrades existing state and will not recreate the datasource, so billing history is kept. See the full documentation [here](https://docs.[REDACTED]/setup/billing#azure).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -67,16 +81,16 @@ func (r *azureResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			},
 			"client_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Azure AD application (client) ID used for federated identity.",
+				MarkdownDescription: "Azure AD application (client) ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					requiresReplaceIfPreviouslySet(),
 				},
 			},
 			"tenant_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Azure AD tenant ID used for federated identity.",
+				MarkdownDescription: "Azure AD tenant ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.",
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					requiresReplaceIfPreviouslySet(),
 				},
 			},
 			"storage_account_name": schema.StringAttribute{
@@ -205,11 +219,98 @@ func (r *azureResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *azureResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update not supported",
-		"All attributes are immutable for costory_billing_datasource_azure. Terraform should replace the resource instead.",
-	)
+func (r *azureResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddError(
+			"Unconfigured Costory client",
+			"The provider did not configure the Costory API client for the resource.",
+		)
+		return
+	}
+
+	var plan, state azureResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if azureResourceRequiresReplace(state, plan) {
+		resp.Diagnostics.AddError(
+			"Update not supported",
+			"Name, storage account, container, and export paths are immutable for costory_billing_datasource_azure. Terraform should replace the resource instead.",
+		)
+		return
+	}
+
+	current, err := r.client.GetAzureBillingDatasource(ctx, state.ID.ValueString())
+	if err != nil {
+		if errors.Is(err, costoryapi.ErrNotFound) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+
+		resp.Diagnostics.AddError(
+			"Unable to read Azure billing datasource",
+			err.Error(),
+		)
+		return
+	}
+
+	if current.ClientID == "" || current.TenantID == "" {
+		resp.Diagnostics.AddError(
+			"Azure datasource still uses SAS credentials",
+			"costory_billing_datasource_azure no longer accepts sas_url. Existing SAS connections keep working until you switch them in Costory (Integrations ⋯ Switch to federated identity). After the switch, set client_id and tenant_id to the Azure AD application and tenant IDs and re-run apply. Terraform does not send a SAS URL or recreate the datasource, so billing history is kept.",
+		)
+		return
+	}
+
+	if plan.ClientID.ValueString() != current.ClientID || plan.TenantID.ValueString() != current.TenantID {
+		resp.Diagnostics.AddError(
+			"Azure AD credentials do not match Costory",
+			fmt.Sprintf(
+				"Costory has client_id %s and tenant_id %s after the federated-identity switch. Update the Terraform configuration to those values. Terraform will not recreate the datasource.",
+				current.ClientID,
+				current.TenantID,
+			),
+		)
+		return
+	}
+
+	plan.mergeAPIResponse(current)
+	if plan.ID.IsNull() || plan.ID.IsUnknown() {
+		plan.ID = types.StringValue(current.ID)
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *azureResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: map[string]schema.Attribute{
+					"id":                   schema.StringAttribute{Computed: true},
+					"status":               schema.StringAttribute{Computed: true},
+					"name":                 schema.StringAttribute{Required: true},
+					"sas_url":              schema.StringAttribute{Required: true, Sensitive: true},
+					"storage_account_name": schema.StringAttribute{Required: true},
+					"container_name":       schema.StringAttribute{Required: true},
+					"actuals_path":         schema.StringAttribute{Required: true},
+					"amortized_path":       schema.StringAttribute{Required: true},
+				},
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var prior azureResourceModelV0
+				resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradeAzureStateV0toV1(prior))...)
+			},
+		},
+	}
 }
 
 func (r *azureResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -294,4 +395,40 @@ func (m *azureResourceModel) mergeAPIResponse(apiResponse *costoryapi.AzureBilli
 	if apiResponse.AmortizedPath != "" {
 		m.AmortizedPath = types.StringValue(apiResponse.AmortizedPath)
 	}
+}
+
+func upgradeAzureStateV0toV1(prior azureResourceModelV0) azureResourceModel {
+	return azureResourceModel{
+		ID:                 prior.ID,
+		Status:             prior.Status,
+		Name:               prior.Name,
+		ClientID:           types.StringNull(),
+		TenantID:           types.StringNull(),
+		StorageAccountName: prior.StorageAccountName,
+		ContainerName:      prior.ContainerName,
+		ActualsPath:        prior.ActualsPath,
+		AmortizedPath:      prior.AmortizedPath,
+	}
+}
+
+func azureResourceRequiresReplace(state, plan azureResourceModel) bool {
+	return !state.Name.Equal(plan.Name) ||
+		!state.StorageAccountName.Equal(plan.StorageAccountName) ||
+		!state.ContainerName.Equal(plan.ContainerName) ||
+		!state.ActualsPath.Equal(plan.ActualsPath) ||
+		!state.AmortizedPath.Equal(plan.AmortizedPath)
+}
+
+func requiresReplaceIfPreviouslySet() planmodifier.String {
+	return stringplanmodifier.RequiresReplaceIf(
+		func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+			if req.StateValue.IsNull() || req.StateValue.IsUnknown() || req.StateValue.ValueString() == "" {
+				return
+			}
+
+			resp.RequiresReplace = true
+		},
+		"Requires replacement when changing an already-set value.",
+		"Requires replacement when changing an already-set value. Filling `client_id` or `tenant_id` after a SAS state upgrade does not recreate the datasource.",
+	)
 }

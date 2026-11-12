@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_azure Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory Azure billing datasource. See the full documentation here https://docs.costory.io/setup/billing#azure.
+  Creates a Costory Azure billing datasource with Azure AD federated identity (client_id and tenant_id). This is a breaking change from sas_url: Costory no longer accepts a SAS URL on create. Existing SAS connections keep working in Costory until you switch them in the UI (Integrations ⋯ Switch to federated identity); Terraform does not perform that switch. After switching, replace sas_url with client_id and tenant_id and apply — the provider upgrades existing state and will not recreate the datasource, so billing history is kept. See the full documentation here https://docs.[REDACTED]/setup/billing#azure.
 ---
 
 # costory_billing_datasource_azure (Resource)
 
-Creates a Costory Azure billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#azure).
+Creates a Costory Azure billing datasource with Azure AD federated identity (`client_id` and `tenant_id`). This is a breaking change from `sas_url`: Costory no longer accepts a SAS URL on create. Existing SAS connections keep working in Costory until you switch them in the UI (**Integrations ⋯ Switch to federated identity**); Terraform does not perform that switch. After switching, replace `sas_url` with `client_id` and `tenant_id` and apply — the provider upgrades existing state and will not recreate the datasource, so billing history is kept. See the full documentation [here](https://docs.[REDACTED]/setup/billing#azure).
 
 ## Example Usage
 
@@ -334,11 +334,11 @@ output "tenant_id" {
 
 - `actuals_path` (String) Path prefix for actual cost exports in the container.
 - `amortized_path` (String) Path prefix for amortized cost exports in the container.
-- `client_id` (String) Azure AD application (client) ID used for federated identity.
+- `client_id` (String) Azure AD application (client) ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.
 - `container_name` (String) Azure storage container name with billing exports.
 - `name` (String) Billing datasource display name.
 - `storage_account_name` (String) Azure storage account name hosting the export container.
-- `tenant_id` (String) Azure AD tenant ID used for federated identity.
+- `tenant_id` (String) Azure AD tenant ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.
 
 ### Read-Only
 
