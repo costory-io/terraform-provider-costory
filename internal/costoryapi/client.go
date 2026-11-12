@@ -159,7 +159,8 @@ type ElasticCloudBillingDatasource struct {
 // AzureBillingDatasourceRequest is the Terraform input used to create/validate an Azure billing datasource.
 type AzureBillingDatasourceRequest struct {
 	Name               string
-	SASURL             string
+	ClientID           string
+	TenantID           string
 	StorageAccountName string
 	ContainerName      string
 	ActualsPath        string
@@ -172,6 +173,8 @@ type AzureBillingDatasource struct {
 	Type               string
 	Status             *string
 	Name               string
+	ClientID           string
+	TenantID           string
 	StorageAccountName string
 	ContainerName      string
 	ActualsPath        string
@@ -294,7 +297,8 @@ type elasticCloudBillingDatasourceAPIResponse struct {
 type azureBillingDatasourceAPIRequest struct {
 	Type               string `json:"type"`
 	Name               string `json:"name"`
-	SASURL             string `json:"sasUrl"`
+	ClientID           string `json:"clientId"`
+	TenantID           string `json:"tenantId"`
 	StorageAccountName string `json:"storageAccountName"`
 	ContainerName      string `json:"containerName"`
 	ActualsPath        string `json:"actualsPath"`
@@ -306,6 +310,8 @@ type azureBillingDatasourceAPIResponse struct {
 	Type               string  `json:"type"`
 	Status             *string `json:"status"`
 	Name               string  `json:"name"`
+	ClientID           string  `json:"clientId"`
+	TenantID           string  `json:"tenantId"`
 	StorageAccountName string  `json:"storageAccountName"`
 	ContainerName      string  `json:"containerName"`
 	ActualsPath        string  `json:"actualsPath"`
@@ -1104,7 +1110,8 @@ func (r AzureBillingDatasourceRequest) toAPIRequest() azureBillingDatasourceAPIR
 	return azureBillingDatasourceAPIRequest{
 		Type:               billingDatasourceTypeAzure,
 		Name:               r.Name,
-		SASURL:             r.SASURL,
+		ClientID:           r.ClientID,
+		TenantID:           r.TenantID,
 		StorageAccountName: r.StorageAccountName,
 		ContainerName:      r.ContainerName,
 		ActualsPath:        r.ActualsPath,
@@ -1195,6 +1202,8 @@ func (r azureBillingDatasourceAPIResponse) toAzureBillingDatasource() *AzureBill
 		Type:               r.Type,
 		Status:             r.Status,
 		Name:               r.Name,
+		ClientID:           r.ClientID,
+		TenantID:           r.TenantID,
 		StorageAccountName: r.StorageAccountName,
 		ContainerName:      r.ContainerName,
 		ActualsPath:        r.ActualsPath,

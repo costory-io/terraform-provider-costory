@@ -3,12 +3,12 @@
 page_title: "costory_billing_datasource_azure Resource - costory"
 subcategory: "Billing Datasources"
 description: |-
-  Creates a Costory Azure billing datasource. See the full documentation here https://docs.costory.io/setup/billing#azure.
+  Creates a Costory Azure billing datasource with Azure AD federated identity (client_id and tenant_id). This is a breaking change from sas_url: Costory no longer accepts a SAS URL on create. Existing SAS connections keep working in Costory until you switch them in the UI (Integrations ⋯ Switch to federated identity); Terraform does not perform that switch. After switching, replace sas_url with client_id and tenant_id and apply — the provider upgrades existing state and will not recreate the datasource, so billing history is kept. See the full documentation here https://docs.[REDACTED]/setup/billing#azure.
 ---
 
 # costory_billing_datasource_azure (Resource)
 
-Creates a Costory Azure billing datasource. See the full documentation [here](https://docs.costory.io/setup/billing#azure).
+Creates a Costory Azure billing datasource with Azure AD federated identity (`client_id` and `tenant_id`). This is a breaking change from `sas_url`: Costory no longer accepts a SAS URL on create. Existing SAS connections keep working in Costory until you switch them in the UI (**Integrations ⋯ Switch to federated identity**); Terraform does not perform that switch. After switching, replace `sas_url` with `client_id` and `tenant_id` and apply — the provider upgrades existing state and will not recreate the datasource, so billing history is kept. See the full documentation [here](https://docs.[REDACTED]/setup/billing#azure).
 
 ## Example Usage
 
@@ -20,6 +20,10 @@ terraform {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
+    }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
     }
     azapi = {
       source  = "Azure/azapi"
@@ -69,12 +73,6 @@ variable "storage_account_name_prefix" {
   default     = "costexports"
 }
 
-variable "sas_token_validity_days" {
-  type        = number
-  description = "Number of days the SAS token remains valid."
-  default     = 900
-}
-
 variable "backfill_month_count" {
   type        = number
   description = "Number of past months to backfill (0 to skip)."
@@ -92,9 +90,15 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
+provider "azuread" {}
+
 provider "costory" {
   token = var.costory_api_token
 }
+
+data "azuread_client_config" "current" {}
+
+data "costory_service_account" "current" {}
 
 resource "azurerm_resource_group" "cost_exports" {
   name     = var.resource_group_name
@@ -150,8 +154,9 @@ resource "azapi_resource" "actuals" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format        = "Parquet"
-      partitionData = true
+      format                = "Parquet"
+      partitionData         = true
+      dataOverwriteBehavior = "OverwritePreviousReport"
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -185,8 +190,9 @@ resource "azapi_resource" "amortized" {
           to   = "2099-01-01T00:00:00Z"
         }
       }
-      format        = "Parquet"
-      partitionData = true
+      format                = "Parquet"
+      partitionData         = true
+      dataOverwriteBehavior = "OverwritePreviousReport"
       deliveryInfo = {
         destination = {
           container      = azurerm_storage_container.billing.name
@@ -261,54 +267,45 @@ resource "azapi_resource_action" "backfill_amortized" {
   }
 }
 
-resource "time_static" "sas_start" {}
-
-data "azurerm_storage_account_sas" "billing" {
-  connection_string = azurerm_storage_account.cost_exports.primary_connection_string
-  https_only        = true
-  signed_version    = "2022-11-02"
-
-  start  = time_static.sas_start.rfc3339
-  expiry = timeadd(time_static.sas_start.rfc3339, "${var.sas_token_validity_days * 24}h")
-
-  resource_types {
-    service   = false
-    container = true
-    object    = true
-  }
-
-  services {
-    blob  = true
-    queue = false
-    table = false
-    file  = false
-  }
-
-  permissions {
-    read    = true
-    write   = false
-    delete  = false
-    list    = true
-    add     = false
-    create  = false
-    update  = false
-    process = false
-    tag     = false
-    filter  = false
-  }
+# Costory is hosted on GCP. Grant read access with an Azure AD app that trusts
+# Costory's Google service account unique ID as a federated credential subject.
+resource "azuread_application" "costory" {
+  display_name = "costory-billing-${random_string.storage_suffix.result}"
 }
 
-locals {
-  blob_endpoint_with_sas = "${azurerm_storage_account.cost_exports.primary_blob_endpoint}${azurerm_storage_container.billing.name}${data.azurerm_storage_account_sas.billing.sas}"
+resource "azuread_service_principal" "costory" {
+  client_id = azuread_application.costory.client_id
+}
+
+resource "azuread_application_federated_identity_credential" "costory" {
+  application_id = azuread_application.costory.id
+  display_name   = "costory-gcp"
+  description    = "Allow Costory to read Azure billing exports via Google federated identity."
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://accounts.google.com"
+  subject        = data.costory_service_account.current.sub_ids[0]
+}
+
+resource "azurerm_role_assignment" "costory_blob_reader" {
+  scope                            = "${azurerm_storage_account.cost_exports.id}/blobServices/default/containers/${azurerm_storage_container.billing.name}"
+  role_definition_name             = "Storage Blob Data Reader"
+  principal_id                     = azuread_service_principal.costory.object_id
+  skip_service_principal_aad_check = true
 }
 
 resource "costory_billing_datasource_azure" "main" {
   name                 = "Azure Production"
-  sas_url              = local.blob_endpoint_with_sas
+  client_id            = azuread_application.costory.client_id
+  tenant_id            = data.azuread_client_config.current.tenant_id
   storage_account_name = azurerm_storage_account.cost_exports.name
   container_name       = azurerm_storage_container.billing.name
   actuals_path         = "actuals/${local.actuals_export_name}"
   amortized_path       = "amortized/${local.amortized_export_name}"
+
+  depends_on = [
+    azuread_application_federated_identity_credential.costory,
+    azurerm_role_assignment.costory_blob_reader,
+  ]
 }
 
 output "storage_account_name" {
@@ -319,19 +316,14 @@ output "storage_container_name" {
   value = azurerm_storage_container.billing.name
 }
 
-output "sas_token" {
-  value     = data.azurerm_storage_account_sas.billing.sas
-  sensitive = true
+output "client_id" {
+  description = "Azure AD application (client) ID for Costory federated identity."
+  value       = azuread_application.costory.client_id
 }
 
-output "blob_endpoint_with_sas" {
-  description = "Full blob endpoint URL with SAS token for accessing billing exports."
-  value       = local.blob_endpoint_with_sas
-  sensitive   = true
-}
-
-output "sas_token_expiry" {
-  value = timeadd(time_static.sas_start.rfc3339, "${var.sas_token_validity_days * 24}h")
+output "tenant_id" {
+  description = "Azure AD tenant ID for Costory federated identity."
+  value       = data.azuread_client_config.current.tenant_id
 }
 ```
 
@@ -342,10 +334,11 @@ output "sas_token_expiry" {
 
 - `actuals_path` (String) Path prefix for actual cost exports in the container.
 - `amortized_path` (String) Path prefix for amortized cost exports in the container.
+- `client_id` (String) Azure AD application (client) ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.
 - `container_name` (String) Azure storage container name with billing exports.
 - `name` (String) Billing datasource display name.
-- `sas_url` (String, Sensitive) Full Azure blob SAS URL including the query string.
 - `storage_account_name` (String) Azure storage account name hosting the export container.
+- `tenant_id` (String) Azure AD tenant ID used for federated identity. Replaces `sas_url`. Changing an already-set value recreates the datasource; filling it after a SAS state upgrade does not.
 
 ### Read-Only
 
