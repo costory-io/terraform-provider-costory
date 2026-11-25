@@ -10,3 +10,4 @@ dist/
 .terraform.lock.hcl
 .env
 *.env
+node_modules/
