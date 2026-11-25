@@ -144,6 +144,18 @@ func TestResolveYAMLPrefersContent(t *testing.T) {
 	}
 }
 
+func TestResolveYAMLPrefersKnownContentWhenFileUnknown(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringValue("name: from-content\n"), types.StringUnknown())
+	if err != nil || !ok {
+		t.Fatalf("unexpected: ok=%v err=%v", ok, err)
+	}
+	if string(raw) != "name: from-content\n" {
+		t.Fatalf("unexpected content: %q", raw)
+	}
+}
+
 func TestResolveYAMLReadsFile(t *testing.T) {
 	t.Parallel()
 
@@ -167,6 +179,26 @@ func TestResolveYAMLUnknownWaits(t *testing.T) {
 	raw, ok, err := resolveYAML(types.StringUnknown(), types.StringValue("x.yaml"))
 	if err != nil || ok || raw != nil {
 		t.Fatalf("unknown content must wait, got ok=%v err=%v raw=%q", ok, err, raw)
+	}
+}
+
+func TestResolveYAMLUnknownFileWaits(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringNull(), types.StringUnknown())
+	if err != nil || ok || raw != nil {
+		t.Fatalf("unknown file must wait, got ok=%v err=%v raw=%q", ok, err, raw)
+	}
+}
+
+func TestConfiguredTreatsEmptyStringAsSet(t *testing.T) {
+	t.Parallel()
+
+	if configured(types.StringNull()) || configured(types.StringUnknown()) {
+		t.Fatal("null and unknown are not configured")
+	}
+	if !configured(types.StringValue("")) {
+		t.Fatal("empty string is configured, so file plus content = \"\" is two sources")
 	}
 }
 

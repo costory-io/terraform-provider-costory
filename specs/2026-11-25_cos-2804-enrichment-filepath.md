@@ -92,8 +92,8 @@ Do not mark `content` sensitive. Do not warn/deprecate `file` (noise for existin
 
 ### Provider behavior
 
-- Validate: exactly one of `file` or `content`.
-- ModifyPlan: if `content` is empty and `file` is set, `os.ReadFile` into `content`; hash into `content_sha256`.
+- Validate: exactly one of `file` or `content`. An empty string still counts as set, so `file` plus `content = ""` is rejected.
+- ModifyPlan: if `content` is empty and `file` is set, `os.ReadFile` into `content`; hash into `content_sha256`. If `file` or `content` is unknown, mark `content` and `content_sha256` unknown so Terraform plans an update.
 - Create / Update: `parseDocument` from planned `content`. No path in apply.
 - Read: parse `state.Content`, compare to `GetEnrichment`. Never `os.ReadFile`. If content is empty (upgrade on a machine that lacked the old path), leave `content_sha256` as stored.
 - `file` is on the Go model so Plan/State Get match the schema, but it is always set null. The path is read from Config.
@@ -152,3 +152,4 @@ History:
 | 2026-11-25 | Compat path chosen | Keep `file`; store YAML in `content`. Do not break existing HCL. |
 | 2026-11-25 | Implemented | Write-only `file`, stored `content`, state upgrade 0→1. |
 | 2026-11-25 | Review fixes | `File` on the model (always null); TF 1.11 noted for remaining `file` users. |
+| 2026-11-25 | Copilot review | Empty `content` still conflicts with `file`; unknown `file` marks derived content unknown. |

@@ -124,7 +124,9 @@ func (r *enrichmentResource) ValidateConfig(ctx context.Context, req resource.Va
 	if resp.Diagnostics.HasError() || file.IsUnknown() || content.IsUnknown() {
 		return
 	}
-	if knownSet(file) == knownSet(content) {
+	// Empty strings still count: content = "" with file set is two sources, and
+	// Terraform would reject ModifyPlan overwriting the configured empty content.
+	if configured(file) == configured(content) {
 		resp.Diagnostics.AddError(
 			"Invalid enrichment source",
 			"Set exactly one of \"file\" or \"content\". Prefer content = file(path) so the YAML is the same on every machine.",
@@ -157,6 +159,13 @@ func (r *enrichmentResource) ModifyPlan(ctx context.Context, req resource.Modify
 		return
 	}
 	if !ok {
+		// Write-only file is null in the plan, so an unknown path would otherwise
+		// look like no change and keep prior content. Mark derived fields unknown
+		// so Terraform plans an update and resolves the YAML at apply.
+		plan.Content = types.StringUnknown()
+		plan.ContentSHA256 = types.StringUnknown()
+		plan.File = types.StringNull()
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 		return
 	}
 	plan.Content = types.StringValue(string(raw))
@@ -297,17 +306,24 @@ func (r *enrichmentResource) apply(ctx context.Context, name, content string) er
 }
 
 func knownSet(value types.String) bool {
-	return !value.IsNull() && !value.IsUnknown() && value.ValueString() != ""
+	return configured(value) && value.ValueString() != ""
+}
+
+func configured(value types.String) bool {
+	return !value.IsNull() && !value.IsUnknown()
 }
 
 // resolveYAML returns the YAML bytes from content or from the file path.
 // ok is false when a value is still unknown.
 func resolveYAML(content, file types.String) (raw []byte, ok bool, err error) {
-	if content.IsUnknown() || file.IsUnknown() {
+	if content.IsUnknown() {
 		return nil, false, nil
 	}
 	if knownSet(content) {
 		return []byte(content.ValueString()), true, nil
+	}
+	if file.IsUnknown() {
+		return nil, false, nil
 	}
 	if !knownSet(file) {
 		return nil, false, fmt.Errorf("set exactly one of file or content")
