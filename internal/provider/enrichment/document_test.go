@@ -1,6 +1,12 @@
 package enrichment
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
 
 func TestDocumentsEqualIgnoresKeyOrderAndNull(t *testing.T) {
 	t.Parallel()
@@ -110,5 +116,142 @@ func TestDocsExampleParses(t *testing.T) {
 	}
 	if document["name"] != "namespace" || len(document["targetColumns"].([]any)) != 1 {
 		t.Fatalf("unexpected document: %#v", document)
+	}
+}
+
+func TestHashBytes(t *testing.T) {
+	t.Parallel()
+
+	got := hashBytes([]byte("abc"))
+	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+	if got != want {
+		t.Fatalf("hashBytes(abc) = %q, want %q", got, want)
+	}
+	if hashBytes([]byte("abd")) == got {
+		t.Fatal("different content must not hash the same")
+	}
+}
+
+func TestResolveYAMLPrefersContent(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringValue("name: from-content\n"), types.StringValue("/no/such/file.yaml"))
+	if err != nil || !ok {
+		t.Fatalf("unexpected: ok=%v err=%v", ok, err)
+	}
+	if string(raw) != "name: from-content\n" {
+		t.Fatalf("unexpected content: %q", raw)
+	}
+}
+
+func TestResolveYAMLPrefersKnownContentWhenFileUnknown(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringValue("name: from-content\n"), types.StringUnknown())
+	if err != nil || !ok {
+		t.Fatalf("unexpected: ok=%v err=%v", ok, err)
+	}
+	if string(raw) != "name: from-content\n" {
+		t.Fatalf("unexpected content: %q", raw)
+	}
+}
+
+func TestResolveYAMLReadsFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "namespace.yaml")
+	if err := os.WriteFile(path, []byte("name: namespace\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	raw, ok, err := resolveYAML(types.StringNull(), types.StringValue(path))
+	if err != nil || !ok {
+		t.Fatalf("unexpected: ok=%v err=%v", ok, err)
+	}
+	if string(raw) != "name: namespace\n" {
+		t.Fatalf("unexpected content: %q", raw)
+	}
+}
+
+func TestResolveYAMLUnknownWaits(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringUnknown(), types.StringValue("x.yaml"))
+	if err != nil || ok || raw != nil {
+		t.Fatalf("unknown content must wait, got ok=%v err=%v raw=%q", ok, err, raw)
+	}
+}
+
+func TestResolveYAMLUnknownFileWaits(t *testing.T) {
+	t.Parallel()
+
+	raw, ok, err := resolveYAML(types.StringNull(), types.StringUnknown())
+	if err != nil || ok || raw != nil {
+		t.Fatalf("unknown file must wait, got ok=%v err=%v raw=%q", ok, err, raw)
+	}
+}
+
+func TestConfiguredTreatsEmptyStringAsSet(t *testing.T) {
+	t.Parallel()
+
+	if configured(types.StringNull()) || configured(types.StringUnknown()) {
+		t.Fatal("null and unknown are not configured")
+	}
+	if !configured(types.StringValue("")) {
+		t.Fatal("empty string is configured, so file plus content = \"\" is two sources")
+	}
+}
+
+func TestResolveYAMLMissingFile(t *testing.T) {
+	t.Parallel()
+
+	_, ok, err := resolveYAML(types.StringNull(), types.StringValue("/no/such/enrichment.yaml"))
+	if err == nil || ok {
+		t.Fatal("expected an error for a missing file")
+	}
+}
+
+func TestUpgradeEnrichmentStateV0toV1ReadsFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "namespace.yaml")
+	if err := os.WriteFile(path, []byte("name: namespace\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := upgradeEnrichmentStateV0toV1(enrichmentResourceModelV0{
+		ID:            types.StringValue("namespace"),
+		Name:          types.StringValue("namespace"),
+		File:          types.StringValue(path),
+		ContentSHA256: types.StringValue("abc"),
+	})
+	if got.Content.ValueString() != "name: namespace\n" {
+		t.Fatalf("expected file bytes in content, got %q", got.Content.ValueString())
+	}
+	if !got.File.IsNull() {
+		t.Fatalf("file must stay null in upgraded state, got %q", got.File.ValueString())
+	}
+	if got.ContentSHA256.ValueString() != "abc" || got.Name.ValueString() != "namespace" {
+		t.Fatalf("expected identity fields kept, got name=%q sha=%q", got.Name.ValueString(), got.ContentSHA256.ValueString())
+	}
+}
+
+func TestUpgradeEnrichmentStateV0toV1MissingFile(t *testing.T) {
+	t.Parallel()
+
+	got := upgradeEnrichmentStateV0toV1(enrichmentResourceModelV0{
+		ID:            types.StringValue("namespace"),
+		Name:          types.StringValue("namespace"),
+		File:          types.StringValue("/no/such/enrichment.yaml"),
+		ContentSHA256: types.StringValue("abc"),
+	})
+	if got.Content.ValueString() != "" {
+		t.Fatalf("missing path should leave content empty, got %q", got.Content.ValueString())
+	}
+	if !got.File.IsNull() {
+		t.Fatalf("file must stay null in upgraded state, got %q", got.File.ValueString())
+	}
+	if got.ContentSHA256.ValueString() != "abc" {
+		t.Fatalf("expected stored hash kept, got %q", got.ContentSHA256.ValueString())
 	}
 }

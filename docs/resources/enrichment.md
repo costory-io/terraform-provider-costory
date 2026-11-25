@@ -2,12 +2,12 @@
 page_title: "costory_enrichment Resource - costory"
 subcategory: ""
 description: |-
-  Manages one Costory enrichment from a YAML file. The file is the customer document, with conditions written in CEL and targetColumns as a map from column to { mode }, in column order. Applying stores the document as a draft; costory_enrichments_publish makes the drafts live in one transaction. Destroying drafts the removal.
+  Manages one Costory enrichment from a YAML document. conditions are CEL and targetColumns is a map from column to { mode }, in column order. Applying stores the document as a draft; costory_enrichments_publish makes the drafts live in one transaction. Destroying drafts the removal. Prefer content = file(path) so the YAML is stored in state and is the same on every machine. file is still accepted and is not stored (Terraform 1.11 or later).
 ---
 
 # costory_enrichment (Resource)
 
-Manages one Costory enrichment from a YAML file. The file is the customer document, with `conditions` written in CEL and `targetColumns` as a map from column to `{ mode }`, in column order. Applying stores the document as a draft; `costory_enrichments_publish` makes the drafts live in one transaction. Destroying drafts the removal.
+Manages one Costory enrichment from a YAML document. `conditions` are CEL and `targetColumns` is a map from column to `{ mode }`, in column order. Applying stores the document as a draft; `costory_enrichments_publish` makes the drafts live in one transaction. Destroying drafts the removal. Prefer `content = file(path)` so the YAML is stored in state and is the same on every machine. `file` is still accepted and is not stored (Terraform 1.11 or later).
 
 ## Example Usage
 
@@ -33,11 +33,13 @@ provider "costory" {
 
 # One resource per YAML file in ./enrichments. Applying stores drafts;
 # costory_enrichments_publish makes them live.
+# `file = "${path.module}/enrichments/${each.value}"` is still accepted
+# (Terraform 1.11+) and is not stored in state.
 resource "costory_enrichment" "all" {
   for_each = fileset("${path.module}/enrichments", "*.yaml")
 
-  name = trimsuffix(each.value, ".yaml")
-  file = "${path.module}/enrichments/${each.value}"
+  name    = trimsuffix(each.value, ".yaml")
+  content = file("${path.module}/enrichments/${each.value}")
 }
 ```
 
@@ -67,10 +69,16 @@ entries:
 
 ### Required
 
-- `file` (String) Path to the enrichment YAML file.
-- `name` (String) Enrichment name. Must match `name` in the YAML file.
+- `name` (String) Enrichment name. Must match `name` in the YAML.
+
+### Optional
+
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `content` (String) YAML body of the enrichment. Prefer `content = file("${path.module}/enrichments/foo.yaml")`. Conflicts with `file`.
+- `file` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Path to the enrichment YAML file. Write-only: not stored in state, so local and CI paths do not drift. Conflicts with `content`. Prefer `content = file(path)`.
 
 ### Read-Only
 
-- `content_sha256` (String) SHA-256 of the YAML file, empty when the live document differs from the file. Pass it to `costory_enrichments_publish`.
+- `content_sha256` (String) SHA-256 of the YAML, empty when the live document differs from the YAML. Pass it to `costory_enrichments_publish`.
 - `id` (String) Enrichment name.

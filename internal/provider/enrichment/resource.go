@@ -24,9 +24,12 @@ import (
 )
 
 var (
-	_ resource.Resource                = &enrichmentResource{}
-	_ resource.ResourceWithConfigure   = &enrichmentResource{}
-	_ resource.ResourceWithImportState = &enrichmentResource{}
+	_ resource.Resource                   = &enrichmentResource{}
+	_ resource.ResourceWithConfigure      = &enrichmentResource{}
+	_ resource.ResourceWithImportState    = &enrichmentResource{}
+	_ resource.ResourceWithModifyPlan     = &enrichmentResource{}
+	_ resource.ResourceWithUpgradeState   = &enrichmentResource{}
+	_ resource.ResourceWithValidateConfig = &enrichmentResource{}
 )
 
 type enrichmentResource struct {
@@ -34,6 +37,17 @@ type enrichmentResource struct {
 }
 
 type enrichmentResourceModel struct {
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Content       types.String `tfsdk:"content"`
+	ContentSHA256 types.String `tfsdk:"content_sha256"`
+	// File is write-only. It must exist so Plan/State Get match the schema,
+	// and it stays null: the path is read from Config, never from plan or state.
+	File types.String `tfsdk:"file"`
+}
+
+// enrichmentResourceModelV0 is the schema that stored a machine-specific file path.
+type enrichmentResourceModelV0 struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	File          types.String `tfsdk:"file"`
@@ -51,7 +65,10 @@ func (r *enrichmentResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *enrichmentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages one Costory enrichment from a YAML file. The file is the customer document, with `conditions` written in CEL and `targetColumns` as a map from column to `{ mode }`, in column order. Applying stores the document as a draft; `costory_enrichments_publish` makes the drafts live in one transaction. Destroying drafts the removal.",
+		Version: 1,
+		MarkdownDescription: "Manages one Costory enrichment from a YAML document. `conditions` are CEL and `targetColumns` is a map from column to `{ mode }`, in column order. " +
+			"Applying stores the document as a draft; `costory_enrichments_publish` makes the drafts live in one transaction. Destroying drafts the removal. " +
+			"Prefer `content = file(path)` so the YAML is stored in state and is the same on every machine. `file` is still accepted and is not stored (Terraform 1.11 or later).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -62,21 +79,24 @@ func (r *enrichmentResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Enrichment name. Must match `name` in the YAML file.",
+				MarkdownDescription: "Enrichment name. Must match `name` in the YAML.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"file": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "Path to the enrichment YAML file.",
+				Optional:            true,
+				WriteOnly:           true,
+				MarkdownDescription: "Path to the enrichment YAML file. Write-only: not stored in state, so local and CI paths do not drift. Conflicts with `content`. Prefer `content = file(path)`.",
+			},
+			"content": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "YAML body of the enrichment. Prefer `content = file(\"${path.module}/enrichments/foo.yaml\")`. Conflicts with `file`.",
 			},
 			"content_sha256": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "SHA-256 of the YAML file, empty when the live document differs from the file. Pass it to `costory_enrichments_publish`.",
-				PlanModifiers: []planmodifier.String{
-					fileHashModifier{},
-				},
+				MarkdownDescription: "SHA-256 of the YAML, empty when the live document differs from the YAML. Pass it to `costory_enrichments_publish`.",
 			},
 		},
 	}
@@ -97,6 +117,86 @@ func (r *enrichmentResource) Configure(_ context.Context, req resource.Configure
 	r.client = client
 }
 
+func (r *enrichmentResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var file, content types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("file"), &file)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("content"), &content)...)
+	if resp.Diagnostics.HasError() || file.IsUnknown() || content.IsUnknown() {
+		return
+	}
+	// Empty strings still count: content = "" with file set is two sources, and
+	// Terraform would reject ModifyPlan overwriting the configured empty content.
+	if configured(file) == configured(content) {
+		resp.Diagnostics.AddError(
+			"Invalid enrichment source",
+			"Set exactly one of \"file\" or \"content\". Prefer content = file(path) so the YAML is the same on every machine.",
+		)
+	}
+}
+
+func (r *enrichmentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan enrichmentResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var file, configContent types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("file"), &file)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("content"), &configContent)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	raw, ok, err := resolveYAML(configContent, file)
+	if err != nil {
+		attribute := path.Root("content")
+		if knownSet(file) {
+			attribute = path.Root("file")
+		}
+		resp.Diagnostics.AddAttributeError(attribute, "Unable to read enrichment", err.Error())
+		return
+	}
+	if !ok {
+		// Write-only file is null in the plan, so an unknown path would otherwise
+		// look like no change and keep prior content. Mark derived fields unknown
+		// so Terraform plans an update and resolves the YAML at apply.
+		plan.Content = types.StringUnknown()
+		plan.ContentSHA256 = types.StringUnknown()
+		plan.File = types.StringNull()
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+		return
+	}
+	plan.Content = types.StringValue(string(raw))
+	plan.ContentSHA256 = types.StringValue(hashBytes(raw))
+	plan.File = types.StringNull()
+	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
+func (r *enrichmentResource) UpgradeState(_ context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: map[string]schema.Attribute{
+					"id":             schema.StringAttribute{Computed: true},
+					"name":           schema.StringAttribute{Required: true},
+					"file":           schema.StringAttribute{Required: true},
+					"content_sha256": schema.StringAttribute{Computed: true},
+				},
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var prior enrichmentResourceModelV0
+				resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradeEnrichmentStateV0toV1(prior))...)
+			},
+		},
+	}
+}
+
 func (r *enrichmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		resp.Diagnostics.AddError("Unconfigured Costory client", "The provider did not configure the Costory API client for the resource.")
@@ -107,11 +207,12 @@ func (r *enrichmentResource) Create(ctx context.Context, req resource.CreateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.apply(ctx, plan.Name.ValueString(), plan.File.ValueString()); err != nil {
+	if err := r.apply(ctx, plan.Name.ValueString(), plan.Content.ValueString()); err != nil {
 		addApplyError(&resp.Diagnostics, err)
 		return
 	}
 	plan.ID = plan.Name
+	plan.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -136,24 +237,20 @@ func (r *enrichmentResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	if !state.File.IsNull() && !state.File.IsUnknown() && state.File.ValueString() != "" {
-		document, readErr := readDocument(state.File.ValueString())
-		if readErr != nil {
-			resp.Diagnostics.AddError("Unable to read enrichment file", readErr.Error())
-			return
-		}
-		hash, hashErr := hashFile(state.File.ValueString())
-		if hashErr != nil {
-			resp.Diagnostics.AddError("Unable to read enrichment file", hashErr.Error())
+	if raw := state.Content.ValueString(); raw != "" {
+		document, parseErr := parseDocument(state.Name.ValueString(), []byte(raw))
+		if parseErr != nil {
+			resp.Diagnostics.AddError("Unable to parse enrichment content", parseErr.Error())
 			return
 		}
 		if documentsEqual(document, current) {
-			state.ContentSHA256 = types.StringValue(hash)
+			state.ContentSHA256 = types.StringValue(hashBytes([]byte(raw)))
 		} else {
 			state.ContentSHA256 = types.StringValue("")
 		}
 	}
 
+	state.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -167,11 +264,12 @@ func (r *enrichmentResource) Update(ctx context.Context, req resource.UpdateRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.apply(ctx, plan.Name.ValueString(), plan.File.ValueString()); err != nil {
+	if err := r.apply(ctx, plan.Name.ValueString(), plan.Content.ValueString()); err != nil {
 		addApplyError(&resp.Diagnostics, err)
 		return
 	}
 	plan.ID = plan.Name
+	plan.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -195,40 +293,62 @@ func (r *enrichmentResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
 }
 
-func (r *enrichmentResource) apply(ctx context.Context, name, file string) error {
-	document, err := readDocument(file)
+func (r *enrichmentResource) apply(ctx context.Context, name, content string) error {
+	document, err := parseDocument(name, []byte(content))
 	if err != nil {
 		return err
 	}
 	documentName, _ := document["name"].(string)
 	if documentName != name {
-		return fmt.Errorf("name in %s is %q, resource name is %q", file, documentName, name)
+		return fmt.Errorf("name in document is %q, resource name is %q", documentName, name)
 	}
 	return r.client.PutEnrichment(ctx, name, document)
 }
 
-type fileHashModifier struct{}
-
-func (m fileHashModifier) Description(context.Context) string {
-	return "Hashes the enrichment YAML file."
+func knownSet(value types.String) bool {
+	return configured(value) && value.ValueString() != ""
 }
 
-func (m fileHashModifier) MarkdownDescription(context.Context) string {
-	return "Hashes the enrichment YAML file."
+func configured(value types.String) bool {
+	return !value.IsNull() && !value.IsUnknown()
 }
 
-func (m fileHashModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
-	var file types.String
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("file"), &file)...)
-	if resp.Diagnostics.HasError() || file.IsNull() || file.IsUnknown() || file.ValueString() == "" {
-		return
+// resolveYAML returns the YAML bytes from content or from the file path.
+// ok is false when a value is still unknown.
+func resolveYAML(content, file types.String) (raw []byte, ok bool, err error) {
+	if content.IsUnknown() {
+		return nil, false, nil
 	}
-	hash, err := hashFile(file.ValueString())
+	if knownSet(content) {
+		return []byte(content.ValueString()), true, nil
+	}
+	if file.IsUnknown() {
+		return nil, false, nil
+	}
+	if !knownSet(file) {
+		return nil, false, fmt.Errorf("set exactly one of file or content")
+	}
+	raw, err = os.ReadFile(file.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("file"), "Unable to read enrichment file", err.Error())
-		return
+		return nil, false, err
 	}
-	resp.PlanValue = types.StringValue(hash)
+	return raw, true, nil
+}
+
+func upgradeEnrichmentStateV0toV1(prior enrichmentResourceModelV0) enrichmentResourceModel {
+	content := types.StringValue("")
+	if path := prior.File.ValueString(); path != "" {
+		if raw, err := os.ReadFile(path); err == nil {
+			content = types.StringValue(string(raw))
+		}
+	}
+	return enrichmentResourceModel{
+		ID:            prior.ID,
+		Name:          prior.Name,
+		Content:       content,
+		ContentSHA256: prior.ContentSHA256,
+		File:          types.StringNull(),
+	}
 }
 
 // readDocument reads a YAML file into the API form of the document.
@@ -303,13 +423,9 @@ func targetColumnList(node *yaml.Node) ([]any, error) {
 	return nil, nil
 }
 
-func hashFile(file string) (string, error) {
-	raw, err := os.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
+func hashBytes(raw []byte) string {
 	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:]), nil
+	return hex.EncodeToString(sum[:])
 }
 
 func documentsEqual(fileDocument, stored map[string]any) bool {
