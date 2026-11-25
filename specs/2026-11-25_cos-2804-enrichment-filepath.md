@@ -1,21 +1,20 @@
 # COS-2804 — Enrichment filepath between CI and local
 
-Status: Spec In Progress
+Status: Implemented following user review
 
-Created with `yarn spec:new cos-2804-enrichment-filepath` before implementation. Waiting on review before any provider code change.
+Created with `yarn spec:new cos-2804-enrichment-filepath` before implementation. Review chose the compatibility path: keep `file`, do not break existing HCL.
 
 **Linear:** [COS-2804](https://linear.app/costory/issue/COS-2804/terraform-issue-with-enrichments-filepath-between-ci-and-local)
 
-Make `costory_enrichment` portable across local and CI by storing YAML content instead of a machine-specific file path.
+Make `costory_enrichment` portable across local and CI by storing YAML content instead of a machine-specific file path. Existing `file = ...` configs keep working.
 
 Related files:
 
-- `internal/provider/enrichment/resource.go` — `file` attribute, `os.ReadFile` in Create/Update/Read and `fileHashModifier`
+- `internal/provider/enrichment/resource.go` — `file` / `content`, plan, Read, state upgrade
 - `examples/resources/costory_enrichment/resource.tf`
 - `examples/resources/costory_enrichments_publish/resource.tf`
 - `docs/resources/enrichment.md` / `docs/resources/enrichments_publish.md` (generated)
 - `templates/resources/enrichment.md.tmpl`
-- mintlify-docs `setup/terraform.mdx` and `features/tagging/enrichments.mdx` (follow-up in that repo)
 
 ---
 
@@ -47,79 +46,76 @@ That shows up as two failures:
 1. **Refresh error.** `Read` opens the path from **state**, not from current config. On CI the laptop path does not exist, so plan dies with `Unable to read enrichment file`.
 2. **Perpetual diff.** When both paths exist, Terraform still plans an update because the `file` strings differ, even when the YAML is identical.
 
-The provider does not call `filepath.Abs`; it does not need to. Asking for a filesystem path and persisting it is enough to pin the resource to one machine.
-
 ---
 
 ## 2. Goal
 
 Same git checkout, same YAML, no path in state: `terraform plan` is empty on CI after a local apply, and the other way around. Refresh never opens a path from another machine.
 
-Operators keep writing YAML files in git. Terraform's built-in `file()` reads them on the machine that is planning.
+Existing setups that pass `file` keep applying without an HCL change.
 
 ---
 
-## 3. Proposed change
+## 3. Change (compatibility path)
 
-Replace the `file` attribute with `content`. Documented usage becomes:
+Keep `file`. Add `content`. Store only the YAML in state. `file` is write-only (Terraform ≥ 1.11): present in config, never in state or plan diffs.
 
 ```hcl
+# Existing configs — unchanged, still valid
 resource "costory_enrichment" "all" {
   for_each = fileset("${path.module}/enrichments", "*.yaml")
+  name     = trimsuffix(each.value, ".yaml")
+  file     = "${path.module}/enrichments/${each.value}"
+}
 
-  name    = trimsuffix(each.value, ".yaml")
-  content = file("${path.module}/enrichments/${each.value}")
+# Preferred for new configs
+resource "costory_enrichment" "all" {
+  for_each = fileset("${path.module}/enrichments", "*.yaml")
+  name     = trimsuffix(each.value, ".yaml")
+  content  = file("${path.module}/enrichments/${each.value}")
 }
 ```
 
-`file()` is evaluated by Terraform, not by the provider. The YAML bytes in config and state are the same on every machine.
+Exactly one of `file` or `content` is set.
 
 ### Schema
 
 | Attribute | Required | In state | Role |
 | --- | --- | --- | --- |
-| `name` | yes | yes | Unchanged. Still must match `name` in the YAML. |
-| `content` | yes | yes | Raw YAML body. |
-| `file` | removed | upgraded away | — |
-| `content_sha256` | computed | yes | Unchanged. Hash of the YAML bytes, empty when live API document ≠ parsed content. Still passed to `costory_enrichments_publish`. |
+| `name` | yes | yes | Unchanged. |
+| `file` | optional, write-only | no | Path. Plan reads it into `content`. Existing HCL keeps working. |
+| `content` | optional, computed | yes | YAML body. Set in config, or filled from `file`. |
+| `content_sha256` | computed | yes | Hash of the YAML bytes, empty when live API document ≠ parsed content. |
 | `id` | computed | yes | Unchanged. |
 
-Do not mark `content` sensitive: enrichment YAML is org mapping, and plans should show the diff.
+Do not mark `content` sensitive. Do not warn/deprecate `file` (noise for existing setups).
 
 ### Provider behavior
 
-- Create / Update: `parseDocument` from `content` (already used by tests). No `os.ReadFile`.
-- Plan modifier: hash `content` into `content_sha256` (today it hashes the file on disk).
-- Read: parse `state.Content`, compare to `GetEnrichment`, set `content_sha256` to the hash or `""`. Never touch the filesystem.
-- Name mismatch error quotes the enrichment name, not a path.
+- Validate: exactly one of `file` or `content`.
+- ModifyPlan: if `content` is empty and `file` is set, `os.ReadFile` into `content`; hash into `content_sha256`.
+- Create / Update: `parseDocument` from planned `content`. No path in apply.
+- Read: parse `state.Content`, compare to `GetEnrichment`. Never `os.ReadFile`. If content is empty (upgrade on a machine that lacked the old path), leave `content_sha256` as stored.
+- `file` is not on the state model.
 
 ### State upgrade (schema 0 → 1)
 
-Follow the Azure resource pattern (`UpgradeState` in `azure_resource.go`).
-
 - If the old `file` path exists on this machine, read it into `content` and drop `file`.
-- If it does not (typical CI after a local apply), set `content` to `""` and keep `content_sha256`. The next plan fills `content` from `file(...)` in config. If the YAML is unchanged, `content_sha256` stays the same, so publish is not retriggered unless Update still PUTs. **Prefer:** when upgrade content is empty, Read skips the local/API compare and leaves `content_sha256` as stored, so a content-only backfill does not flip the hash. Update may still PUT the same document once to persist `content` in state; that is acceptable.
-
-Existing configs must change `file = path` to `content = file(path)` before or in the same apply as the provider upgrade. Terraform will reject unknown `file` once it is removed from the schema.
+- If it does not, set `content` to `""` and keep `content_sha256`. The next plan fills `content` from config `file` or `content`. One apply may PUT the same document to persist content in state; publish is not retriggered if the hash is unchanged.
 
 ### Docs
 
-- Provider examples and generated registry docs.
-- mintlify-docs `setup/terraform.mdx` and `features/tagging/enrichments.mdx` (separate PR in that repo, same wording).
+- Examples prefer `content = file(...)`.
+- Schema text says `file` is still accepted and is not stored.
+- mintlify-docs pages are a follow-up in that repo.
 
 ---
 
-## 4. Alternatives considered
+## 4. Alternatives not taken
 
-**A. Keep `file`, suppress path diffs when hashes match.** Refresh still uses the path in state, so CI still errors. Rejected.
+**Replace `file` with `content` only.** Breaking HCL. Rejected in review.
 
-**B. Keep `file` and rewrite it to a path relative to cwd.** `terraform apply -chdir` and Terraform Cloud make cwd/module paths diverge. HashiCorp's guidance is not to persist cwd-relative paths. Rejected.
-
-**C. `content` plus optional write-only `file` (`ExactlyOneOf`).** Old HCL keeps working; `file` never lands in state; a plan modifier reads the path at plan time into `content`. Needs Terraform ≥ 1.11 (`WriteOnly` on plugin-framework 1.16+, we are on 1.17.0). More code, two ways to say the same thing. Use only if we must avoid a breaking config change.
-
-**D. Store only the hash, not the YAML.** Refresh cannot compare the local document to the API without the body. Rejected.
-
-Recommended: **replace `file` with `content`** (section 3). The resource shipped in 0.3.1 (PR #17); the HCL change is one function call. Alternative C is the fallback if review wants a deprecation window.
+**Keep `file` in state and suppress path diffs.** Refresh still uses the path in state. Rejected.
 
 ---
 
@@ -128,29 +124,30 @@ Recommended: **replace `file` with `content`** (section 3). The resource shipped
 - Enrichment API, YAML schema, or `costory_enrichments_publish` behavior (examples only).
 - Changing how `content_sha256` is used as the publish trigger.
 - Normalizing YAML before hashing (byte-for-byte, as today).
+- mintlify-docs (separate repo).
 
 ---
 
 ## 6. Tests
 
-- `parseDocument` / `documentsEqual` stay; add hashing of a content string (no temp file).
-- Read never calls `os.ReadFile`.
+- Hash a content string (no temp file).
+- `resolveYAML`: content wins; file is read when content is empty; missing file errors.
 - State upgrade: existing path → `content` populated; missing path → empty `content`, no error.
-- Example HCL uses `content = file(...)`.
 - `go test ./...` and regenerate docs.
 
 ---
 
 ## 7. Checklist
 
-- [ ] Spec reviewed — **do not implement until this is confirmed**
-- [ ] Confirm breaking `file` → `content` vs write-only `file` compatibility (alternative C)
-- [ ] Provider schema, upgrade, examples, registry docs
-- [ ] mintlify-docs Terraform / enrichments pages
-- [ ] Tests listed above
+- [x] Spec reviewed — compatibility path (`file` write-only + `content`)
+- [x] Provider schema, upgrade, examples, registry docs
+- [x] Tests listed above
+- [ ] mintlify-docs Terraform / enrichments pages (follow-up)
 
 History:
 
 | Date | Status | Notes |
 | --- | --- | --- |
-| 2026-11-25 | Spec drafted | COS-2804. `yarn spec:new` first; waiting for review. |
+| 2026-11-25 | Spec drafted | COS-2804. `yarn spec:new` first. |
+| 2026-11-25 | Compat path chosen | Keep `file`; store YAML in `content`. Do not break existing HCL. |
+| 2026-11-25 | Implemented | Write-only `file`, stored `content`, state upgrade 0→1. |

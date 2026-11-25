@@ -16,8 +16,8 @@ Publishes the enrichment drafts written by `costory_enrichment`: Costory compile
 resource "costory_enrichment" "all" {
   for_each = fileset("${path.module}/enrichments", "*.yaml")
 
-  name = trimsuffix(each.value, ".yaml")
-  file = "${path.module}/enrichments/${each.value}"
+  name    = trimsuffix(each.value, ".yaml")
+  content = file("${path.module}/enrichments/${each.value}")
 }
 
 # Publishes every draft in one transaction after the enrichments are written,
