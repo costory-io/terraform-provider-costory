@@ -22,7 +22,7 @@ function usage() {
   console.error(`Usage: yarn spec:new <name> [description]
 
   <name>         Slug for the file (e.g. onboarding-v3)
-  [description]  Optional short summary
+  [description]  Optional short summary (rendered in <small>)
 `)
   process.exit(1)
 }
@@ -54,7 +54,7 @@ function formatDate(date) {
 
 function buildContent(title, description) {
   const smallLine = description
-    ? `${description}`
+    ? `<small>${description}</small>`
     : ""
 
   return `# ${title}
