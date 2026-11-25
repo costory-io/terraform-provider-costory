@@ -41,6 +41,9 @@ type enrichmentResourceModel struct {
 	Name          types.String `tfsdk:"name"`
 	Content       types.String `tfsdk:"content"`
 	ContentSHA256 types.String `tfsdk:"content_sha256"`
+	// File is write-only. It must exist so Plan/State Get match the schema,
+	// and it stays null: the path is read from Config, never from plan or state.
+	File types.String `tfsdk:"file"`
 }
 
 // enrichmentResourceModelV0 is the schema that stored a machine-specific file path.
@@ -158,6 +161,7 @@ func (r *enrichmentResource) ModifyPlan(ctx context.Context, req resource.Modify
 	}
 	plan.Content = types.StringValue(string(raw))
 	plan.ContentSHA256 = types.StringValue(hashBytes(raw))
+	plan.File = types.StringNull()
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 }
 
@@ -199,6 +203,7 @@ func (r *enrichmentResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 	plan.ID = plan.Name
+	plan.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -236,6 +241,7 @@ func (r *enrichmentResource) Read(ctx context.Context, req resource.ReadRequest,
 		}
 	}
 
+	state.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -254,6 +260,7 @@ func (r *enrichmentResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 	plan.ID = plan.Name
+	plan.File = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -324,6 +331,7 @@ func upgradeEnrichmentStateV0toV1(prior enrichmentResourceModelV0) enrichmentRes
 		Name:          prior.Name,
 		Content:       content,
 		ContentSHA256: prior.ContentSHA256,
+		File:          types.StringNull(),
 	}
 }
 

@@ -19,8 +19,8 @@ provider "costory" {
 
 # One resource per YAML file in ./enrichments. Applying stores drafts;
 # costory_enrichments_publish makes them live.
-# `file = "${path.module}/enrichments/${each.value}"` is still accepted and is
-# not stored in state.
+# `file = "${path.module}/enrichments/${each.value}"` is still accepted
+# (Terraform 1.11+) and is not stored in state.
 resource "costory_enrichment" "all" {
   for_each = fileset("${path.module}/enrichments", "*.yaml")
 

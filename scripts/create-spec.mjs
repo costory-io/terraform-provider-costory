@@ -11,7 +11,7 @@
  *   → specs/2026-05-18_onboarding-v3.md
  */
 
-import { writeFileSync, existsSync, mkdirSync } from "node:fs"
+import { writeFileSync, mkdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -22,7 +22,7 @@ function usage() {
   console.error(`Usage: yarn spec:new <name> [description]
 
   <name>         Slug for the file (e.g. onboarding-v3)
-  [description]  Optional short summary (rendered in <small>)
+  [description]  Optional short summary
 `)
   process.exit(1)
 }
@@ -87,12 +87,15 @@ const filepath = join(SPECS_DIR, filename)
 
 mkdirSync(SPECS_DIR, { recursive: true })
 
-if (existsSync(filepath)) {
-  console.error(`Error: spec already exists: ${filepath}`)
-  process.exit(1)
-}
-
 const content = buildContent(toTitle(slug), description)
-writeFileSync(filepath, content, "utf8")
+try {
+  writeFileSync(filepath, content, { encoding: "utf8", flag: "wx" })
+} catch (err) {
+  if (err && err.code === "EEXIST") {
+    console.error(`Error: spec already exists: ${filepath}`)
+    process.exit(1)
+  }
+  throw err
+}
 
 console.log(`Created ${filepath}`)

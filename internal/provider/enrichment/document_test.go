@@ -122,11 +122,13 @@ func TestDocsExampleParses(t *testing.T) {
 func TestHashBytes(t *testing.T) {
 	t.Parallel()
 
-	if hashBytes([]byte("abc")) == hashBytes([]byte("abd")) {
-		t.Fatal("different content must not hash the same")
+	got := hashBytes([]byte("abc"))
+	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+	if got != want {
+		t.Fatalf("hashBytes(abc) = %q, want %q", got, want)
 	}
-	if hashBytes([]byte("abc")) != hashBytes([]byte("abc")) {
-		t.Fatal("same content must hash the same")
+	if hashBytes([]byte("abd")) == got {
+		t.Fatal("different content must not hash the same")
 	}
 }
 
@@ -194,6 +196,9 @@ func TestUpgradeEnrichmentStateV0toV1ReadsFile(t *testing.T) {
 	if got.Content.ValueString() != "name: namespace\n" {
 		t.Fatalf("expected file bytes in content, got %q", got.Content.ValueString())
 	}
+	if !got.File.IsNull() {
+		t.Fatalf("file must stay null in upgraded state, got %q", got.File.ValueString())
+	}
 	if got.ContentSHA256.ValueString() != "abc" || got.Name.ValueString() != "namespace" {
 		t.Fatalf("expected identity fields kept, got name=%q sha=%q", got.Name.ValueString(), got.ContentSHA256.ValueString())
 	}
@@ -210,6 +215,9 @@ func TestUpgradeEnrichmentStateV0toV1MissingFile(t *testing.T) {
 	})
 	if got.Content.ValueString() != "" {
 		t.Fatalf("missing path should leave content empty, got %q", got.Content.ValueString())
+	}
+	if !got.File.IsNull() {
+		t.Fatalf("file must stay null in upgraded state, got %q", got.File.ValueString())
 	}
 	if got.ContentSHA256.ValueString() != "abc" {
 		t.Fatalf("expected stored hash kept, got %q", got.ContentSHA256.ValueString())

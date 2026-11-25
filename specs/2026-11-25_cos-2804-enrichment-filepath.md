@@ -52,13 +52,13 @@ That shows up as two failures:
 
 Same git checkout, same YAML, no path in state: `terraform plan` is empty on CI after a local apply, and the other way around. Refresh never opens a path from another machine.
 
-Existing setups that pass `file` keep applying without an HCL change.
+Existing setups that pass `file` keep applying without an HCL change on Terraform 1.11+. On Terraform 1.10 or earlier, switch to `content = file(...)` before upgrading the provider.
 
 ---
 
 ## 3. Change (compatibility path)
 
-Keep `file`. Add `content`. Store only the YAML in state. `file` is write-only (Terraform ≥ 1.11): present in config, never in state or plan diffs.
+Keep `file`. Add `content`. Store only the YAML in state. `file` is write-only (Terraform ≥ 1.11): present in config, never in state or plan diffs. Write-only attributes require Terraform 1.11; older Terraform must use `content = file(...)`.
 
 ```hcl
 # Existing configs — unchanged, still valid
@@ -96,7 +96,7 @@ Do not mark `content` sensitive. Do not warn/deprecate `file` (noise for existin
 - ModifyPlan: if `content` is empty and `file` is set, `os.ReadFile` into `content`; hash into `content_sha256`.
 - Create / Update: `parseDocument` from planned `content`. No path in apply.
 - Read: parse `state.Content`, compare to `GetEnrichment`. Never `os.ReadFile`. If content is empty (upgrade on a machine that lacked the old path), leave `content_sha256` as stored.
-- `file` is not on the state model.
+- `file` is on the Go model so Plan/State Get match the schema, but it is always set null. The path is read from Config.
 
 ### State upgrade (schema 0 → 1)
 
@@ -151,3 +151,4 @@ History:
 | 2026-11-25 | Spec drafted | COS-2804. `yarn spec:new` first. |
 | 2026-11-25 | Compat path chosen | Keep `file`; store YAML in `content`. Do not break existing HCL. |
 | 2026-11-25 | Implemented | Write-only `file`, stored `content`, state upgrade 0→1. |
+| 2026-11-25 | Review fixes | `File` on the model (always null); TF 1.11 noted for remaining `file` users. |
